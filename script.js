@@ -1,7 +1,7 @@
 /**
  * @file script.js
  * @description Gestione completa per un planner di turni interattivo.
- * @version 20.1 - Final Fix
+ * @version 23 
  * @summary Versione consolidata con tutte le funzionalità, inclusi Schemi di Ordinamento e Scambio Matrici.
  */
 
@@ -20,13 +20,193 @@ try {
     };
 }
 
+// Dichiarazione globale di appState
+let appState = {
+    currentDate: new Date(),
+    currentTheme: "standard",
+    colorizeShiftText: false,
+    show3DEffect: true,
+    showModSymbols: true,
+    showCoverageInfo: true,
+    showPerformanceBars: true,
+    showAssignments: true,
+    showShiftHours: false, 
+    showMatrixOnly: false,
+    isAssignmentMode: false,
+    appearance: {
+        toggleColor: "#4f46e5",
+        workCellBgColor: "#dbeafe",
+        workCellTextColor: "#1e40af",
+        highlightBgColor: "#eef2ff",
+        showSundayBars: true
+    },
+    daySummaryModalPosition: { top: null, left: null },
+    operatori: [],
+    turni: [],
+    matrici: [],
+    assignments: [],
+    reasons: [],
+    plannerData: {},
+    coverageOptimal: {},
+    validationRules: {
+        minRestHours: 11,
+        maxConsecutiveDays: 5
+    },
+    matriceSwaps: [],
+    orderingSchemes: []
+};
+
+// Funzioni di utilità globali
+function getMonthKey(date) { return `${date.getFullYear()}-${date.getMonth()}`; }
+function getDaysInMonth(year, month) { return new Date(year, month + 1, 0).getDate(); }
+function dateDiffInDays(a, b) { const _MS_PER_DAY = 86400000; const utc1 = Date.UTC(a.getFullYear(), a.getMonth(), a.getDate()); const utc2 = Date.UTC(b.getFullYear(), b.getMonth(), b.getDate()); return Math.floor((utc2 - utc1) / _MS_PER_DAY); }
+function getActiveOperators(year, month, includeInactive = false) {
+    const monthStartDate = new Date(year, month, 1);
+    const monthEndDate = new Date(year, month + 1, 0);
+    return appState.operatori.filter(op => {
+        if (!includeInactive && !op.isActive) return false;
+        if (op.isCounted === undefined) op.isCounted = true; 
+        const opStartDate = new Date(op.dataInizio);
+        const opEndDate = new Date(op.dataFine);
+        return monthEndDate >= opStartDate && monthStartDate <= opEndDate;
+    });
+}
+function showToast(message, type = 'info', duration = 3000) {
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+    const toast = document.createElement('div');
+    const typeClasses = {
+        info: 'bg-gray-800 text-white',
+        success: 'bg-green-600 text-white',
+        error: 'bg-red-600 text-white',
+        warning: 'bg-yellow-600 text-white'
+    };
+    toast.className = `p-4 rounded-lg shadow-xl text-sm font-semibold transition-all duration-300 transform translate-x-full opacity-0 ${typeClasses[type] || typeClasses.info}`;
+    toast.textContent = message;
+    container.appendChild(toast);
+    setTimeout(() => {
+        toast.classList.remove('translate-x-full', 'opacity-0');
+    }, 10);
+    setTimeout(() => {
+        toast.classList.add('translate-x-full', 'opacity-0');
+        setTimeout(() => container.removeChild(toast), 300);
+    }, duration);
+}
+
+// Funzioni di supporto mobile
+function isMobileDevice() {
+    return window.innerWidth <= 768 || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+}
+
+function setupMobileOptimizations() {
+    if (isMobileDevice()) {
+        // Aggiungi classe mobile al body
+        document.body.classList.add('mobile-device');
+        
+        // Ottimizza scroll per mobile
+        const plannerContainer = document.querySelector('.planner-container-wrapper');
+        if (plannerContainer) {
+            plannerContainer.style.overflowX = 'auto';
+            plannerContainer.style.webkitOverflowScrolling = 'touch';
+        }
+        
+        // Gestione orientamento
+        window.addEventListener('orientationchange', function() {
+            setTimeout(() => {
+                renderPlanner();
+            }, 100);
+        });
+        
+        // Migliora performance touch
+        document.addEventListener('touchstart', function() {}, { passive: true });
+        document.addEventListener('touchmove', function() {}, { passive: true });
+    }
+}
+
+// Funzione per gestire il merge dei turni su mobile
+function handleMobileTurnMerge(cellElement) {
+    if (!isMobileDevice()) return false;
+    
+    // Implementa logica di merge touch-friendly
+    const longPressTimer = setTimeout(() => {
+        cellElement.classList.add('merge-mode');
+        // Mostra indicatori visivi per merge
+        showMergeIndicators(cellElement);
+    }, 800); // Long press di 800ms
+    
+    cellElement.addEventListener('touchend', () => {
+        clearTimeout(longPressTimer);
+    }, { once: true });
+    
+    return true;
+}
+
+function showMergeIndicators(cellElement) {
+    // Aggiungi indicatori visivi per il merge
+    const indicator = document.createElement('div');
+    indicator.className = 'merge-indicator';
+    indicator.innerHTML = '🔗';
+    cellElement.appendChild(indicator);
+    
+    setTimeout(() => {
+        if (indicator.parentNode) {
+            indicator.parentNode.removeChild(indicator);
+        }
+    }, 3000);
+}
+
+// Funzione per gestire tap rapidi su mobile
+function handleMobileTap(cellElement, event) {
+    if (!isMobileDevice()) return false;
+    
+    // Previeni il comportamento di default per evitare doppi click
+    event.preventDefault();
+    
+    // Aggiungi feedback visivo per il tap
+    cellElement.classList.add('tap-feedback');
+    setTimeout(() => {
+        cellElement.classList.remove('tap-feedback');
+    }, 150);
+    
+    // Simula il click normale
+    const clickEvent = new MouseEvent('click', {
+        bubbles: true,
+        cancelable: true,
+        view: window
+    });
+    cellElement.dispatchEvent(clickEvent);
+    
+    return true;
+}
+
+// Funzione per migliorare la gestione dei modali su mobile
+function optimizeModalForMobile(modalElement) {
+    if (!isMobileDevice() || !modalElement) return;
+    
+    // Aggiungi classe mobile al modale
+    modalElement.classList.add('mobile-optimized');
+    
+    // Gestisci il ridimensionamento del viewport
+    const handleViewportChange = () => {
+        const vh = window.innerHeight * 0.01;
+        modalElement.style.setProperty('--vh', `${vh}px`);
+    };
+    
+    handleViewportChange();
+    window.addEventListener('resize', handleViewportChange);
+    window.addEventListener('orientationchange', handleViewportChange);
+}
+
 document.addEventListener('DOMContentLoaded', function() {
+    
+    // Setup ottimizzazioni mobile
+    setupMobileOptimizations();
     
     // =================================================================================
     // STATO, COSTANTI E CONFIGURAZIONE
-    // =================================================================================
+    // ================================================================================
 
-    const APP_VERSION = "Versione 19_4 Ai - Copia 5 - Final Fix";
+    const APP_VERSION = "Versione 23";
 
     let undoStack = [];
     let redoStack = [];
@@ -124,37 +304,7 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     };
 
-    let appState = {
-        currentDate: new Date(),
-        currentTheme: "standard",
-        colorizeShiftText: false,
-        show3DEffect: true,
-        showModSymbols: true,
-        showCoverageInfo: true,
-        showPerformanceBars: true,
-        showAssignments: true,
-        showShiftHours: false, 
-        showMatrixOnly: false,
-        isAssignmentMode: false,
-        appearance: {
-            toggleColor: "#4f46e5",
-            workCellBgColor: "#dbeafe",
-            workCellTextColor: "#1e40af",
-            highlightBgColor: "#eef2ff",
-            showSundayBars: true
-        },
-        daySummaryModalPosition: { top: null, left: null },
-        operatori: [],
-        turni: [],
-        matrici: [],
-        assignments: [],
-        reasons: [],
-        plannerData: {},
-        coverageOptimal: {},
-        matriceSwaps: [],
-        orderingSchemes: [],
-        validationRules: {}
-    };
+    // appState è ora dichiarato globalmente all'inizio del file
     
     let swapState = { isActive: false, step: 0, firstCell: null, secondCell: null };
     let currentAssignmentContext = { opId: null, day: null };
@@ -218,26 +368,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    function showToast(message, type = 'info', duration = 3000) {
-        const container = document.getElementById('toast-container');
-        if (!container) return;
-        const toast = document.createElement('div');
-        const typeClasses = {
-            info: 'bg-gray-800 text-white',
-            success: 'bg-green-600 text-white',
-            error: 'bg-red-600 text-white'
-        };
-        toast.className = `p-4 rounded-lg shadow-xl text-sm font-semibold transition-all duration-300 transform translate-x-full opacity-0 ${typeClasses[type]}`;
-        toast.textContent = message;
-        container.appendChild(toast);
-        setTimeout(() => {
-            toast.classList.remove('translate-x-full', 'opacity-0');
-        }, 10);
-        setTimeout(() => {
-            toast.classList.add('translate-x-full', 'opacity-0');
-            toast.addEventListener('transitionend', () => toast.remove());
-        }, duration);
-    }
+    // showToast ora dichiarata globalmente
 
     // Emergency Management System
     let emergencyState = {
@@ -499,18 +630,7 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('export-logs-btn').addEventListener('click', exportChangeLogs);
     document.getElementById('clear-logs-btn').addEventListener('click', clearChangeLogs);
     
-    // Event listeners per la modal di modifica notifiche
-    document.getElementById('close-edit-notification').addEventListener('click', closeEditNotificationModal);
-    document.getElementById('cancel-edit-notification').addEventListener('click', closeEditNotificationModal);
-    document.getElementById('save-edit-notification').addEventListener('click', saveEditNotification);
-    document.getElementById('delete-notification').addEventListener('click', deleteNotification);
-    
-    // Chiudi modal cliccando fuori
-    document.getElementById('modal-edit-notification').addEventListener('click', (e) => {
-        if (e.target.id === 'modal-edit-notification') {
-            closeEditNotificationModal();
-        }
-    });
+
         
         // Carica i log iniziali
         loadAndDisplayLogs();
@@ -1152,7 +1272,27 @@ document.addEventListener('DOMContentLoaded', function() {
         const opId = parseInt(cell.dataset.opId, 10);
         const day = parseInt(cell.dataset.day, 10);
         
-        openCellActionModal(opId, day, 'change');
+        // Determina il tipo di modale da aprire basato sulla modifica esistente
+        const cellData = getCellData(opId, day);
+        let focusSection = 'change'; // Default
+        
+        if (cellData) {
+            // Se c'è una nota, apri il modale delle note
+            if (cellData.nota && cellData.nota.trim() !== '') {
+                focusSection = 'note';
+            }
+            // Se ci sono ore extra, apri il modale delle ore extra
+            else if (cellData.oreExtra && cellData.oreExtra > 0) {
+                focusSection = 'extra';
+            }
+            // Se c'è un periodo di assegnazione, apri il modale del periodo
+            else if (cellData.periodoInizio || cellData.periodoFine) {
+                focusSection = 'period';
+            }
+            // Altrimenti, mantieni il default 'change'
+        }
+        
+        openCellActionModal(opId, day, focusSection);
     }
 
     // =================================================================================
@@ -1229,9 +1369,7 @@ document.addEventListener('DOMContentLoaded', function() {
         return 'Altro';
     }
 
-    function getDaysInMonth(year, month) { return new Date(year, month + 1, 0).getDate(); }
-    function dateDiffInDays(a, b) { const _MS_PER_DAY = 86400000; const utc1 = Date.UTC(a.getFullYear(), a.getMonth(), a.getDate()); const utc2 = Date.UTC(b.getFullYear(), b.getMonth(), b.getDate()); return Math.floor((utc2 - utc1) / _MS_PER_DAY); }
-    function getMonthKey(date) { return `${date.getFullYear()}-${date.getMonth()}`; }
+    // Funzioni di utilità ora dichiarate globalmente
 
     function getContrastingTextColor(hexcolor){
         if (!hexcolor || typeof hexcolor !== 'string') return '#000000';
@@ -1402,17 +1540,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    function getActiveOperators(year, month, includeInactive = false) {
-        const monthStartDate = new Date(year, month, 1);
-        const monthEndDate = new Date(year, month + 1, 0);
-        return appState.operatori.filter(op => {
-            if (!includeInactive && !op.isActive) return false;
-            if (op.isCounted === undefined) op.isCounted = true; 
-            const opStartDate = new Date(op.dataInizio);
-            const opEndDate = new Date(op.dataFine);
-            return monthEndDate >= opStartDate && monthStartDate <= opEndDate;
-        });
-    }
+    // getActiveOperators ora dichiarata globalmente
 
     function getIndicatorClass(modType) {
         const classMap = { 'C': 'mod-indicator-c', 'S': 'mod-indicator-s', 'G': 'mod-indicator-g' };
@@ -1580,9 +1708,13 @@ function getEffectiveOrderingScheme(date) {
                     </svg>
                 </div>`;
             }
+            // Rileva se siamo su mobile per mostrare solo cognomi
+            const isMobile = window.innerWidth <= 480;
+            const displayName = isMobile ? op.cognome : `${op.cognome} ${op.nome}`;
+            
             let rowHTML = `<td draggable="true" data-op-id="${op.id}" class="px-4 py-1 font-medium whitespace-nowrap sticky left-0 z-10 flex justify-start items-center operator-name-cell" style="background-color: ${lightOpColor}; border-left: 8px solid ${matrice?.colore || 'transparent'}; cursor: pointer; position: relative; min-width: 300px;">
                             ${orderIndicatorHtml}
-                            <span style="color: ${getContrastingTextColor(lightOpColor)}; font-weight: 600; padding-left: ${effectiveScheme ? '1.25rem' : '0'};">${op.cognome} ${op.nome}</span>
+                            <span style="color: ${getContrastingTextColor(lightOpColor)}; font-weight: 600; padding-left: ${effectiveScheme ? '1.25rem' : '0'};" data-surname="${op.cognome}" title="${op.cognome} ${op.nome}">${displayName}</span>
                             <div class="operator-controls">
                                 <button class="focus-mode-btn p-1 rounded-full hover:bg-gray-300" title="Modalità Focus" data-action="focus-operator" data-op-id="${op.id}">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z" /><path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.27 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd" /></svg>
@@ -1744,18 +1876,32 @@ function getEffectiveOrderingScheme(date) {
                 if (data.extraInfo && !appState.showMatrixOnly) {
                     const typeMap = { 'straordinario': 'Straordinario', 'prolungamento': 'Prolungamento', 'rientro': 'Rientro' };
                     const typeText = typeMap[data.extraInfo.type] || 'Extra';
-                    let detailsContent = `<div class="extra-detail-line"><strong>${typeText} ${turnoToShow || ''}</strong>`;
+                    
+                    // Layout orizzontale - Prima riga: tipo, turno e gettone
+                    let detailsContent = `<div class="extra-detail-line horizontal-layout">`;
+                    detailsContent += `<span class="extra-type-badge ${data.extraInfo.type}">${data.extraInfo.type.charAt(0).toUpperCase()}</span>`;
+                    detailsContent += `<strong>${turnoToShow || typeText}</strong>`;
                     if (data.extraInfo.gettone) detailsContent += ` <span class="gettone-badge">G</span>`;
-                    if(data.extraInfo.startTime && data.extraInfo.endTime) {
-                        detailsContent += `: ${data.extraInfo.startTime} - ${data.extraInfo.endTime}`;
-                    }
                     detailsContent += `</div>`;
+                    
+                    // Seconda riga: orari e ore extra (se disponibili)
+                    let secondLineContent = [];
+                    if(data.extraInfo.startTime && data.extraInfo.endTime) {
+                        secondLineContent.push(`⏰ ${data.extraInfo.startTime}-${data.extraInfo.endTime}`);
+                    }
                     if(typeof data.extraInfo.hours === 'number' && data.extraInfo.hours > 0) {
-                        detailsContent += `<div class="extra-detail-line">+${data.extraInfo.hours.toFixed(1)} ore extra</div>`;
+                        secondLineContent.push(`<span class="extra-hours-display">+${data.extraInfo.hours.toFixed(1)}h</span>`);
                     }
+                    
+                    if(secondLineContent.length > 0) {
+                        detailsContent += `<div class="extra-detail-line horizontal-layout">${secondLineContent.join(' • ')}</div>`;
+                    }
+                    
+                    // Terza riga: nota (se presente)
                     if(data.extraInfo.note) {
-                        detailsContent += `<div class="extra-detail-line note">Nota: ${data.extraInfo.note}</div>`;
+                        detailsContent += `<div class="extra-detail-line note horizontal-layout">💬 ${data.extraInfo.note}</div>`;
                     }
+                    
                     extraDetailsHTML = `<div class="cell-extra-details">${detailsContent}</div>`;
                 }
 
@@ -3399,6 +3545,11 @@ function handleScambiPanelClick(e) {
         const file = event.target.files[0];
         if (!file) return;
 
+        // Backup preventivo se abilitato
+        if (backupState.backupBeforeCritical) {
+            performIncrementalBackup('emergency', 'Backup automatico prima del caricamento stato');
+        }
+
         const reader = new FileReader();
         reader.onload = function(e) {
             try {
@@ -4200,79 +4351,12 @@ function handleScambiPanelClick(e) {
     }
 }
     
-    async function exportExtrasToPdf() {
-        showLoader();
-        // Attiva temporaneamente il filtro per mostrare i dettagli
-        activeFilters.add('+');
-        await renderPlanner(); // Aspetta che il rendering sia completo
-
-        try {
-            const { jsPDF } = window.jspdf;
-            const plannerWrapper = document.getElementById('planner-container-wrapper');
-            const originalBackgroundColor = plannerWrapper.style.backgroundColor;
-            plannerWrapper.style.backgroundColor = '#FFFFFF';
-
-            const focusButtons = document.querySelectorAll('.focus-mode-btn');
-            focusButtons.forEach(btn => btn.style.display = 'none');
-
-            // Configurazione PDF A3
-            const pdf = new jsPDF({ 
-                orientation: 'landscape', 
-                unit: 'mm', 
-                format: 'a3' 
-            });
-
-            // Cattura ad alta risoluzione con scala ottimizzata
-            const canvas = await html2canvas(plannerWrapper, {
-                scale: 1.8, // Ridotto da 2 a 1.8 per bilanciare qualità e performance
-                useCORS: true,
-                backgroundColor: '#FFFFFF',
-                height: plannerWrapper.scrollHeight, // Cattura l'intera altezza
-                width: plannerWrapper.scrollWidth   // Cattura l'intera larghezza
-            });
-
-            plannerWrapper.style.backgroundColor = originalBackgroundColor;
-            focusButtons.forEach(btn => btn.style.display = '');
-            
-            // Disattiva il filtro e ripristina la vista
-            activeFilters.delete('+');
-            await renderPlanner();
-
-            const imgData = canvas.toDataURL('image/png');
-            
-            // Adattamento ottimizzato alle dimensioni A3
-            const pdfWidth = pdf.internal.pageSize.getWidth();
-            const pdfHeight = pdf.internal.pageSize.getHeight();
-            const margin = 8; // Ridotto da 10 a 8mm per più spazio
-            const ratio = canvas.width / canvas.height;
-            
-            // Calcolo per utilizzare al massimo lo spazio disponibile
-            let finalImgWidth = pdfWidth - (margin * 2);
-            let finalImgHeight = finalImgWidth / ratio;
-            
-            // Se l'altezza supera lo spazio disponibile, adatta in base all'altezza
-            if (finalImgHeight > pdfHeight - (margin * 2)) {
-                finalImgHeight = pdfHeight - (margin * 2);
-                finalImgWidth = finalImgHeight * ratio;
-            }
-            
-            // Centra l'immagine nella pagina
-            const x = (pdfWidth - finalImgWidth) / 2;
-            const y = (pdfHeight - finalImgHeight) / 2;
-
-            pdf.addImage(imgData, 'PNG', x, y, finalImgWidth, finalImgHeight);
-            const monthLong = appState.currentDate.toLocaleDateString('it-IT', { month: 'long' });
-            const year = appState.currentDate.getFullYear();
-            pdf.save(`Planner_Extra_${monthLong}_${year}.pdf`);
-
-        } catch (error) {
-            console.error("Errore durante la creazione del PDF degli extra:", error);
-            showConfirmation("Errore durante la generazione del PDF degli extra.", "Errore Esportazione", true);
-            activeFilters.delete('+'); // Assicurati di disattivare il filtro anche in caso di errore
-            await renderPlanner();
-        } finally {
-            hideLoader();
-        }
+    /**
+     * Funzione per esportare gli extra in formato PDF
+     * Utilizza la nuova implementazione di stampa dedicata
+     */
+    function exportExtrasToPdf() {
+        generateExtraPrintReport();
     }
 
 
@@ -4465,6 +4549,11 @@ function handleScambiPanelClick(e) {
         );
 
         if (confirmed) {
+            // Backup preventivo se abilitato
+            if (backupState.backupBeforeCritical) {
+                performIncrementalBackup('emergency', 'Backup automatico prima della cancellazione modifiche');
+            }
+            
             saveHistoryState(); 
             operatorsToClear.forEach(op => {
                 for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
@@ -4856,6 +4945,9 @@ function setupEventListeners() {
     if (updateOnlineBtn) {
         updateOnlineBtn.addEventListener('click', aggiornaFileOnline);
     }
+    
+    // Inizializza l'interfaccia dei log di cambi all'avvio per registrare gli event listeners
+    initializeChangeLogsInterface();
 }
 
 function setupSettingsEventListeners() {
@@ -5224,251 +5316,6 @@ function openOrderChangeModal(draggedOpId, targetOpId) {
     // GESTIONE MODAL MODIFICA NOTIFICHE
     // =================================================================================
     
-    function openEditNotificationModal(opId, day, modType, indicatorElement) {
-        const operators = getActiveOperators(appState.currentDate.getFullYear(), appState.currentDate.getMonth(), true);
-        const operator = operators.find(op => op.id === opId);
-        if (!operator) return;
-        
-        const date = new Date(appState.currentDate.getFullYear(), appState.currentDate.getMonth(), day);
-        const dateStr = formatDate(date);
-        
-        // Trova i dati della notifica esistente
-        const notificationData = findNotificationData(opId, day, modType);
-        
-        // Popola le informazioni della notifica
-        document.getElementById('edit-notification-operator').textContent = operator.name;
-        document.getElementById('edit-notification-date').textContent = dateStr;
-        document.getElementById('edit-notification-type').textContent = getModTypeDescription(modType);
-        document.getElementById('edit-notification-status').textContent = notificationData?.status || 'Attiva';
-        
-        // Popola i campi di modifica con i dati esistenti
-        populateEditNotificationFields(notificationData, opId, day);
-        
-        // Mostra la modal
-        const modal = document.getElementById('modal-edit-notification');
-        modal.classList.remove('hidden');
-        modal.classList.add('flex');
-        
-        // Salva i dati di riferimento per il salvataggio
-        modal.dataset.opId = opId;
-        modal.dataset.day = day;
-        modal.dataset.modType = modType;
-    }
-    
-    function findNotificationData(opId, day, modType) {
-        // Cerca nei dati esistenti la notifica corrispondente
-        const cellData = getCellData(opId, day);
-        if (!cellData) return null;
-        
-        // Restituisce i dati della notifica basati sul tipo
-        switch(modType) {
-            case 'C': return cellData.cambio || null;
-            case 'S': return cellData.scambio || null;
-            case 'G': return cellData.gettone || null;
-            case '+': return cellData.extra || null;
-            default: return null;
-        }
-    }
-    
-    function getModTypeDescription(modType) {
-        const descriptions = {
-            'C': 'Cambio Turno',
-            'S': 'Scambio',
-            'G': 'Gettone',
-            '+': 'Ore Extra'
-        };
-        return descriptions[modType] || 'Modifica';
-    }
-    
-    function populateEditNotificationFields(notificationData, opId, day) {
-        // Reset tutti i campi
-        document.getElementById('edit-notification-shift').value = '';
-        document.getElementById('edit-notification-shift-reason').value = '';
-        document.getElementById('edit-notification-start-time').value = '';
-        document.getElementById('edit-notification-end-time').value = '';
-        document.getElementById('edit-notification-overtime').checked = false;
-        document.getElementById('edit-notification-note').value = '';
-        document.getElementById('edit-notification-internal-comment').value = '';
-        document.getElementById('edit-notification-priority').value = 'normale';
-        document.getElementById('edit-notification-notification-type').value = 'cambio';
-        document.getElementById('edit-notification-gettone').checked = false;
-        document.getElementById('edit-notification-confirmed').checked = false;
-        document.getElementById('edit-notification-send-sms').checked = false;
-        
-        // Popola il dropdown dei turni
-        populateShiftDropdown();
-        
-        // Se ci sono dati esistenti, popolali
-        if (notificationData) {
-            if (notificationData.newShift) document.getElementById('edit-notification-shift').value = notificationData.newShift;
-            if (notificationData.reason) document.getElementById('edit-notification-shift-reason').value = notificationData.reason;
-            if (notificationData.startTime) document.getElementById('edit-notification-start-time').value = notificationData.startTime;
-            if (notificationData.endTime) document.getElementById('edit-notification-end-time').value = notificationData.endTime;
-            if (notificationData.overtime) document.getElementById('edit-notification-overtime').checked = notificationData.overtime;
-            if (notificationData.note) document.getElementById('edit-notification-note').value = notificationData.note;
-            if (notificationData.internalComment) document.getElementById('edit-notification-internal-comment').value = notificationData.internalComment;
-            if (notificationData.priority) document.getElementById('edit-notification-priority').value = notificationData.priority;
-            if (notificationData.type) document.getElementById('edit-notification-notification-type').value = notificationData.type;
-            if (notificationData.gettone) document.getElementById('edit-notification-gettone').checked = notificationData.gettone;
-            if (notificationData.confirmed) document.getElementById('edit-notification-confirmed').checked = notificationData.confirmed;
-            if (notificationData.sendSms) document.getElementById('edit-notification-send-sms').checked = notificationData.sendSms;
-        }
-    }
-    
-    function populateShiftDropdown() {
-        const shiftSelect = document.getElementById('edit-notification-shift');
-        shiftSelect.innerHTML = '<option value="">Mantieni turno attuale</option>';
-        
-        // Aggiungi i turni disponibili
-        appState.turni.forEach(shift => {
-            const option = document.createElement('option');
-            option.value = shift.sigla;
-            option.textContent = `${shift.sigla} (${shift.descrizione})`;
-            shiftSelect.appendChild(option);
-        });
-    }
-    
-    function closeEditNotificationModal() {
-        const modal = document.getElementById('modal-edit-notification');
-        if (modal) {
-            modal.classList.replace('flex', 'hidden');
-            modal.querySelectorAll('form').forEach(form => form.reset());
-        }
-    }
-    
-    function saveEditNotification() {
-        const modal = document.getElementById('modal-edit-notification');
-        if (!modal) {
-            console.error('Modal di modifica notifica non trovata');
-            return;
-        }
-        
-        const opId = parseInt(modal.dataset.opId);
-        const day = parseInt(modal.dataset.day);
-        const modType = modal.dataset.modType;
-        
-        if (!opId || !day || !modType) {
-            console.error('Dati della modal non validi:', { opId, day, modType });
-            alert('Errore: dati della notifica non validi');
-            return;
-        }
-        
-        // Funzione helper per ottenere il valore di un elemento in modo sicuro
-        const getElementValue = (id, defaultValue = '') => {
-            const element = document.getElementById(id);
-            return element ? (element.type === 'checkbox' ? element.checked : element.value) : defaultValue;
-        };
-        
-        // Raccogli i dati dal form
-        const notificationData = {
-            newShift: getElementValue('edit-notification-shift'),
-            reason: getElementValue('edit-notification-shift-reason'),
-            startTime: getElementValue('edit-notification-start-time'),
-            endTime: getElementValue('edit-notification-end-time'),
-            overtime: getElementValue('edit-notification-overtime', false),
-            note: getElementValue('edit-notification-note'),
-            internalComment: getElementValue('edit-notification-internal-comment'),
-            priority: getElementValue('edit-notification-priority'),
-            type: getElementValue('edit-notification-notification-type'),
-            gettone: getElementValue('edit-notification-gettone', false),
-            confirmed: getElementValue('edit-notification-confirmed', false),
-            sendSms: getElementValue('edit-notification-send-sms', false),
-            lastModified: new Date().toISOString(),
-            modifiedBy: 'current_user' // Sostituire con l'utente corrente
-        };
-        
-        // Salva i dati della notifica
-        saveNotificationData(opId, day, modType, notificationData);
-        
-        // Registra il cambiamento nel log
-        const operators = getActiveOperators(appState.currentDate.getFullYear(), appState.currentDate.getMonth(), true);
-        logChange({
-            type: 'notification_edit',
-            operatorId: opId,
-            operatorName: operators.find(op => op.id === opId)?.name,
-            date: formatDate(new Date(appState.currentDate.getFullYear(), appState.currentDate.getMonth(), day)),
-            modType: modType,
-            changes: notificationData,
-            timestamp: new Date().toISOString()
-        });
-        
-        // Aggiorna la visualizzazione
-        renderPlanner();
-        
-        // Chiudi la modal
-        closeEditNotificationModal();
-        
-        // Mostra messaggio di conferma
-        alert('Notifica modificata con successo!');
-    }
-    
-    function deleteNotification() {
-        if (!confirm('Sei sicuro di voler eliminare questa notifica?')) return;
-        
-        const modal = document.getElementById('modal-edit-notification');
-        if (!modal) {
-            console.error('Modal di modifica notifica non trovata');
-            return;
-        }
-        
-        const opId = parseInt(modal.dataset.opId);
-        const day = parseInt(modal.dataset.day);
-        const modType = modal.dataset.modType;
-        
-        if (!opId || !day || !modType) {
-            console.error('Dati della modal non validi:', { opId, day, modType });
-            alert('Errore: dati della notifica non validi');
-            return;
-        }
-        
-        // Rimuovi i dati della notifica
-        removeNotificationData(opId, day, modType);
-        
-        // Registra il cambiamento nel log
-        const operators = getActiveOperators(appState.currentDate.getFullYear(), appState.currentDate.getMonth(), true);
-        logChange({
-            type: 'notification_delete',
-            operatorId: opId,
-            operatorName: operators.find(op => op.id === opId)?.name,
-            date: formatDate(new Date(appState.currentDate.getFullYear(), appState.currentDate.getMonth(), day)),
-            modType: modType,
-            timestamp: new Date().toISOString()
-        });
-        
-        // Aggiorna la visualizzazione
-        renderPlanner();
-        
-        // Chiudi la modal
-        closeEditNotificationModal();
-        
-        // Mostra messaggio di conferma
-        alert('Notifica eliminata con successo!');
-    }
-    
-    function saveNotificationData(opId, day, modType, data) {
-        // Ottieni o crea i dati della cella
-        let cellData = getCellData(opId, day) || {};
-        
-        // Salva i dati basati sul tipo di modifica
-        switch(modType) {
-            case 'C':
-                cellData.cambio = data;
-                break;
-            case 'S':
-                cellData.scambio = data;
-                break;
-            case 'G':
-                cellData.gettone = data;
-                break;
-            case '+':
-                cellData.extra = data;
-                break;
-        }
-        
-        // Salva i dati della cella
-        setCellData(opId, day, cellData);
-    }
-    
     function removeNotificationData(opId, day, modType) {
         let cellData = getCellData(opId, day);
         if (!cellData) return;
@@ -5555,6 +5402,38 @@ function openOrderChangeModal(draggedOpId, targetOpId) {
             cell.addEventListener('dragleave', handleDragLeave);
             cell.addEventListener('drop', handleDrop);
             cell.addEventListener('dragend', handleDragEnd);
+            
+            // Event listeners per touch mobile
+            if (isMobileDevice()) {
+                let touchStartTime = 0;
+                let longPressTimer = null;
+                
+                cell.addEventListener('touchstart', (e) => {
+                    touchStartTime = Date.now();
+                    longPressTimer = setTimeout(() => {
+                        handleMobileTurnMerge(cell);
+                    }, 800);
+                }, { passive: true });
+                
+                cell.addEventListener('touchend', (e) => {
+                    if (longPressTimer) {
+                        clearTimeout(longPressTimer);
+                    }
+                    
+                    const touchDuration = Date.now() - touchStartTime;
+                    if (touchDuration < 800) {
+                        // Tap normale - comportamento standard
+                        e.preventDefault();
+                        cell.click();
+                    }
+                }, { passive: false });
+                
+                cell.addEventListener('touchmove', () => {
+                    if (longPressTimer) {
+                        clearTimeout(longPressTimer);
+                    }
+                }, { passive: true });
+            }
         });
     }
 
@@ -6421,9 +6300,6 @@ function openOrderChangeModal(draggedOpId, targetOpId) {
         closeMiniMenu();
 
         switch (action) {
-            case 'edit-notification':
-                openEditNotificationModal(opId, day);
-                break;
             case 'change':
                 openCellActionModal(opId, day, 'change');
                 break;
@@ -6503,6 +6379,9 @@ function openOrderChangeModal(draggedOpId, targetOpId) {
 
     function applyFiltersAndRender() {
         renderPlanner();
+        
+        // Ottimizza larghezza colonne per filtro extra
+        optimizeExtraDetailsLayout();
 
         if (activeFilters.size > 0) {
             document.querySelectorAll('.planner-cell').forEach(cell => {
@@ -6533,6 +6412,114 @@ function openOrderChangeModal(draggedOpId, targetOpId) {
         }
     }
 
+
+    function optimizeExtraDetailsLayout() {
+        const plannerTable = document.getElementById('planner-table');
+        const showExtraDetails = activeFilters.has('+');
+        
+        if (showExtraDetails) {
+            // Identifica le colonne (giorni) che contengono celle con dettagli extra
+            const extraCells = document.querySelectorAll('.planner-cell.extra-details-visible');
+            const columnsWithExtra = new Set();
+            let maxContentWidth = 140; // Larghezza minima aumentata
+            
+            extraCells.forEach(cell => {
+                const day = parseInt(cell.dataset.day);
+                if (day) {
+                    columnsWithExtra.add(day);
+                }
+                
+                const extraDetails = cell.querySelector('.cell-extra-details');
+                if (extraDetails) {
+                    // Crea elemento temporaneo per misurare il contenuto
+                    const tempDiv = document.createElement('div');
+                    tempDiv.style.cssText = 'position: absolute; visibility: hidden; white-space: nowrap; font-size: 0.75rem;';
+                    tempDiv.textContent = extraDetails.textContent;
+                    document.body.appendChild(tempDiv);
+                    
+                    const contentWidth = Math.min(tempDiv.offsetWidth + 30, 220); // +30 per padding, max 220px
+                    maxContentWidth = Math.max(maxContentWidth, contentWidth);
+                    
+                    document.body.removeChild(tempDiv);
+                }
+            });
+            
+            // Applica riduzione del 40% della larghezza quando filtro extra è attivo
+            const reducedWidth = Math.max(maxContentWidth * 0.6, 84); // Riduzione 40%, minimo 84px
+            
+            // Estendi l'intera colonna per ogni giorno che contiene extra
+            let columnStyles = '';
+            columnsWithExtra.forEach(day => {
+                const columnIndex = day + 2; // +2 perché le prime due colonne sono operatori e ore
+                columnStyles += `
+                    table.show-extra-details .planner-cell:nth-child(${columnIndex}) {
+                        width: ${reducedWidth}px !important;
+                        min-width: ${reducedWidth}px !important;
+                        max-width: ${reducedWidth}px !important;
+                    }
+                    table.show-extra-details th:nth-child(${columnIndex}) {
+                        width: ${reducedWidth}px !important;
+                        min-width: ${reducedWidth}px !important;
+                        max-width: ${reducedWidth}px !important;
+                    }`;
+            });
+            
+            // Applica stili per uniformare l'altezza delle righe
+            const style = document.getElementById('dynamic-extra-style') || document.createElement('style');
+            style.id = 'dynamic-extra-style';
+            style.textContent = `
+                ${columnStyles}
+                
+                /* Uniforma altezza righe quando filtro extra è attivo */
+                table.show-extra-details tbody tr {
+                    height: auto !important;
+                }
+                
+                table.show-extra-details .planner-cell {
+                    vertical-align: top !important;
+                    height: auto !important;
+                }
+                
+                table.show-extra-details .base-cell {
+                    min-height: 60px !important;
+                    height: auto !important;
+                    align-items: flex-start !important;
+                    justify-content: flex-start !important;
+                }
+                
+                /* Assicura che tutte le celle della riga abbiano la stessa altezza */
+                table.show-extra-details tbody tr {
+                    display: table-row;
+                }
+                
+                table.show-extra-details .planner-cell:not(.extra-details-visible) .base-cell {
+                    min-height: 60px !important;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                }
+            `;
+            
+            if (!document.getElementById('dynamic-extra-style')) {
+                document.head.appendChild(style);
+            }
+            
+            // Forza il ricalcolo del layout dopo un breve delay
+            setTimeout(() => {
+                plannerTable.style.tableLayout = 'auto';
+                requestAnimationFrame(() => {
+                    plannerTable.style.tableLayout = 'fixed';
+                });
+            }, 50);
+            
+        } else {
+            // Rimuovi stili dinamici quando il filtro non è attivo
+            const dynamicStyle = document.getElementById('dynamic-extra-style');
+            if (dynamicStyle) {
+                dynamicStyle.remove();
+            }
+        }
+    }
 
     function closeDaySummaryModal() {
         const daySummaryModal = document.getElementById('modal-day-summary');
@@ -6720,7 +6707,7 @@ function openOrderChangeModal(draggedOpId, targetOpId) {
         }
 
         // Informazioni sulla modifica
-        if (info.modType && info.modType !== 'E' && info.modType !== 'M') {
+        if (info.modType && info.modType !== 'E' && info.modType !== '+') {
             let modSection = '<div class="tooltip-section">';
             
             if (info.modType === 'C') {
@@ -7660,7 +7647,7 @@ function openOrderChangeModal(draggedOpId, targetOpId) {
             localStorage.setItem(backupId, JSON.stringify(backupData));
             
             let backupIndex = JSON.parse(localStorage.getItem('backup_index') || '[]');
-            backupIndex.push({ id: backupId, timestamp, type });
+            backupIndex.push({ id: backupId, timestamp, type, reason });
             if (backupIndex.length > backupState.maxBackups) {
                 const oldBackup = backupIndex.shift();
                 localStorage.removeItem(oldBackup.id);
@@ -7669,8 +7656,14 @@ function openOrderChangeModal(draggedOpId, targetOpId) {
             
             backupState.lastBackup = timestamp;
             saveBackupSettings();
+            updateBackupUI();
+            
+            // Download automatico se abilitato
+            if (backupState.autoDownload && type !== 'emergency') {
+                downloadBackup(backupId);
+            }
 
-            const message = type === 'manual' ? 'Backup manuale completato' : `Backup di emergenza creato: ${backupId}`;
+            const message = type === 'manual' ? 'Backup manuale completato' : `Backup automatico creato: ${backupId}`;
             showToast(message, 'success');
             return backupId;
         } catch (error) {
@@ -7682,6 +7675,155 @@ function openOrderChangeModal(draggedOpId, targetOpId) {
 
     function saveBackupSettings() {
         localStorage.setItem('backup_settings', JSON.stringify(backupState));
+    }
+
+    // Nuove funzioni per gestione avanzata backup
+    function downloadBackup(backupId) {
+        try {
+            const backupData = localStorage.getItem(backupId);
+            if (!backupData) {
+                showToast('Backup non trovato', 'error');
+                return;
+            }
+
+            const backup = JSON.parse(backupData);
+            const filename = `gestione_turni_backup_${backup.timestamp.split('T')[0]}_${backup.type}.json`;
+            
+            const blob = new Blob([JSON.stringify(backup.data.appState, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            showToast(`Backup scaricato: ${filename}`, 'success');
+        } catch (error) {
+            console.error('Errore download backup:', error);
+            showToast('Errore durante il download', 'error');
+        }
+    }
+
+    function downloadAllBackups() {
+        const backupIndex = JSON.parse(localStorage.getItem('backup_index') || '[]');
+        if (backupIndex.length === 0) {
+            showToast('Nessun backup disponibile', 'info');
+            return;
+        }
+
+        backupIndex.forEach(backup => {
+            setTimeout(() => downloadBackup(backup.id), 100);
+        });
+        
+        showToast(`Download di ${backupIndex.length} backup avviato`, 'success');
+    }
+
+    function restoreFromBackup(backupId) {
+        try {
+            const backupData = localStorage.getItem(backupId);
+            if (!backupData) {
+                showToast('Backup non trovato', 'error');
+                return;
+            }
+
+            const backup = JSON.parse(backupData);
+            const confirmed = confirm(`Ripristinare il backup del ${new Date(backup.timestamp).toLocaleString()}?\n\nTipo: ${backup.type}\nMotivo: ${backup.reason || 'N/A'}\n\nATTENZIONE: Tutti i dati correnti verranno sostituiti!`);
+            
+            if (!confirmed) return;
+
+            // Backup di emergenza prima del ripristino
+            performIncrementalBackup('emergency', 'Backup automatico prima del ripristino');
+            
+            // Ripristina i dati
+            Object.assign(appState, backup.data.appState);
+            localStorage.setItem('appState', JSON.stringify(appState));
+            
+            // Ricarica l'interfaccia
+            location.reload();
+            
+        } catch (error) {
+            console.error('Errore ripristino backup:', error);
+            showToast('Errore durante il ripristino', 'error');
+        }
+    }
+
+    function deleteBackup(backupId) {
+        const confirmed = confirm('Eliminare definitivamente questo backup?');
+        if (!confirmed) return;
+
+        try {
+            localStorage.removeItem(backupId);
+            
+            let backupIndex = JSON.parse(localStorage.getItem('backup_index') || '[]');
+            backupIndex = backupIndex.filter(backup => backup.id !== backupId);
+            localStorage.setItem('backup_index', JSON.stringify(backupIndex));
+            
+            updateBackupUI();
+            showToast('Backup eliminato', 'success');
+        } catch (error) {
+            console.error('Errore eliminazione backup:', error);
+            showToast('Errore durante l\'eliminazione', 'error');
+        }
+    }
+
+    function clearOldBackups() {
+        const confirmed = confirm('Eliminare tutti i backup tranne gli ultimi 3?');
+        if (!confirmed) return;
+
+        try {
+            let backupIndex = JSON.parse(localStorage.getItem('backup_index') || '[]');
+            const toKeep = backupIndex.slice(-3);
+            const toDelete = backupIndex.slice(0, -3);
+            
+            toDelete.forEach(backup => {
+                localStorage.removeItem(backup.id);
+            });
+            
+            localStorage.setItem('backup_index', JSON.stringify(toKeep));
+            updateBackupUI();
+            
+            showToast(`${toDelete.length} backup vecchi eliminati`, 'success');
+        } catch (error) {
+            console.error('Errore pulizia backup:', error);
+            showToast('Errore durante la pulizia', 'error');
+        }
+    }
+
+    function renderBackupList() {
+        const backupList = document.getElementById('backup-list');
+        const backupIndex = JSON.parse(localStorage.getItem('backup_index') || '[]');
+        
+        if (backupIndex.length === 0) {
+            backupList.innerHTML = '<div class="text-gray-500 text-xs text-center py-2">Nessun backup disponibile</div>';
+            return;
+        }
+
+        backupList.innerHTML = backupIndex.slice(-10).reverse().map(backup => {
+            const date = new Date(backup.timestamp);
+            const timeStr = date.toLocaleString('it-IT', { 
+                day: '2-digit', 
+                month: '2-digit', 
+                hour: '2-digit', 
+                minute: '2-digit' 
+            });
+            
+            return `
+                <div class="backup-item">
+                    <div class="backup-item-info">
+                        <div class="backup-item-time">${timeStr}</div>
+                        <div class="backup-item-type">${backup.type} ${backup.reason ? '- ' + backup.reason : ''}</div>
+                    </div>
+                    <div class="backup-item-actions">
+                        <button class="backup-item-btn download" onclick="downloadBackup('${backup.id}')" title="Scarica">📥</button>
+                        <button class="backup-item-btn restore" onclick="restoreFromBackup('${backup.id}')" title="Ripristina">🔄</button>
+                        <button class="backup-item-btn delete" onclick="deleteBackup('${backup.id}')" title="Elimina">🗑️</button>
+                    </div>
+                </div>
+            `;
+        }).join('');
     }
 
     function showBackupPanel() {
@@ -7697,7 +7839,9 @@ function openOrderChangeModal(draggedOpId, targetOpId) {
         document.getElementById('backup-interval').value = backupState.intervalMinutes;
         document.getElementById('backup-max-count').value = backupState.maxBackups;
         document.getElementById('backup-emergency-enabled').checked = backupState.emergencyBackupEnabled;
-        document.getElementById('backup-pre-operation').checked = backupState.isEnabled;
+        document.getElementById('backup-auto-enabled').checked = backupState.isEnabled;
+        document.getElementById('backup-auto-download').checked = backupState.autoDownload || false;
+        document.getElementById('backup-pre-operation').checked = backupState.backupBeforeCritical || false;
         document.getElementById('backup-settings-modal').style.display = 'flex';
     }
 
@@ -7709,7 +7853,9 @@ function openOrderChangeModal(draggedOpId, targetOpId) {
         backupState.intervalMinutes = parseInt(document.getElementById('backup-interval').value);
         backupState.maxBackups = parseInt(document.getElementById('backup-max-count').value);
         backupState.emergencyBackupEnabled = document.getElementById('backup-emergency-enabled').checked;
-        backupState.isEnabled = document.getElementById('backup-pre-operation').checked;
+        backupState.isEnabled = document.getElementById('backup-auto-enabled').checked;
+        backupState.autoDownload = document.getElementById('backup-auto-download').checked;
+        backupState.backupBeforeCritical = document.getElementById('backup-pre-operation').checked;
         
         if (backupState.isEnabled) startAutoBackup(); else stopAutoBackup();
         
@@ -7761,6 +7907,9 @@ function openOrderChangeModal(draggedOpId, targetOpId) {
         if (toggleBtn) {
             toggleBtn.textContent = stats.isEnabled ? 'Pausa' : 'Avvia';
         }
+        
+        // Aggiorna la lista dei backup
+        renderBackupList();
     }
 
     function initializeAutoBackup() {
@@ -7785,6 +7934,10 @@ function openOrderChangeModal(draggedOpId, targetOpId) {
         document.getElementById('close-backup-settings').addEventListener('click', hideBackupSettings);
         document.getElementById('btn-cancel-backup-settings').addEventListener('click', hideBackupSettings);
         document.getElementById('btn-save-backup-settings').addEventListener('click', saveBackupSettingsFromUI);
+        
+        // Nuovi event listener per funzionalità avanzate
+        document.getElementById('btn-download-all-backups').addEventListener('click', downloadAllBackups);
+        document.getElementById('btn-clear-old-backups').addEventListener('click', clearOldBackups);
     }
 
     // =================================================================================
@@ -9127,3 +9280,994 @@ function openOrderChangeModal(draggedOpId, targetOpId) {
         }
     }
 });
+
+// ===== FUNZIONI PER STAMPA PDF EXTRA =====
+
+/**
+ * Genera e visualizza il report di stampa per gli extra
+ */
+function generateExtraPrintReport() {
+    const year = appState.currentDate.getFullYear();
+    const month = appState.currentDate.getMonth();
+    const monthKey = getMonthKey(appState.currentDate);
+    const monthName = appState.currentDate.toLocaleDateString('it-IT', { month: 'long', year: 'numeric' });
+    
+    // Raccoglie tutti gli extra del mese
+    const extraData = collectExtraData(year, month, monthKey);
+    
+    if (extraData.length === 0) {
+        showToast('Nessun extra trovato per il mese selezionato', 'warning');
+        return;
+    }
+    
+    // Genera HTML del report in stile planner
+    const reportHTML = generatePlannerStyleReportHTML(monthName, extraData);
+    
+    // Crea finestra di stampa
+    createPrintWindow(reportHTML);
+}
+
+/**
+ * Raccoglie tutti i dati degli extra per il mese specificato
+ */
+function collectExtraData(year, month, monthKey) {
+    const extraData = [];
+    const plannerData = appState.plannerData[monthKey] || {};
+    const operators = getActiveOperators(year, month, false);
+    const operatorMap = new Map(operators.map(op => [op.id, op]));
+    
+    // Itera attraverso tutti i dati del planner
+    Object.entries(plannerData).forEach(([key, data]) => {
+        if (data && data.extraInfo && typeof data.extraInfo.hours === 'number' && data.extraInfo.hours > 0) {
+            const [opId, day] = key.split('-').map(Number);
+            const operator = operatorMap.get(opId);
+            
+            if (operator) {
+                const extra = data.extraInfo;
+                
+                // Determina il tipo di extra
+                let type = 'Extra';
+                if (extra.type === 'straordinario') type = 'Straordinario';
+                else if (extra.type === 'anticipato') type = 'Rientro';
+                else if (extra.type === 'prolungamento') type = 'Prolungamento';
+                
+                extraData.push({
+                    operator: `${operator.cognome} ${operator.nome}`,
+                    operatorId: opId,
+                    day: day,
+                    date: new Date(year, month, day),
+                    type: type,
+                    shift: data.turnoId ? appState.turni.find(t => t.id === data.turnoId)?.descrizione || '' : '',
+                    gettone: extra.gettone || false,
+                    startTime: extra.startTime || '',
+                    endTime: extra.endTime || '',
+                    hours: extra.hours || 0,
+                    amount: calculateExtraAmount(extra),
+                    notes: extra.notes || ''
+                });
+            }
+        }
+    });
+    
+    // Ordina per operatore e data
+    return extraData.sort((a, b) => {
+        if (a.operator !== b.operator) {
+            return a.operator.localeCompare(b.operator);
+        }
+        return a.date - b.date;
+    });
+}
+
+/**
+ * Calcola l'importo dell'extra (placeholder - da implementare logica specifica)
+ */
+function calculateExtraAmount(extra) {
+    // Logica di calcolo da implementare in base alle regole aziendali
+    const baseRate = 15; // Euro per ora base
+    const hours = parseFloat(extra.hours) || 0;
+    
+    let multiplier = 1;
+    switch (extra.type) {
+        case 'Straordinario':
+            multiplier = 1.25;
+            break;
+        case 'Prolungamento':
+            multiplier = 1.15;
+            break;
+        case 'Rientro':
+            multiplier = 1.5;
+            break;
+        default:
+            multiplier = 1;
+    }
+    
+    let amount = hours * baseRate * multiplier;
+    
+    // Aggiungi gettone se presente
+    if (extra.gettone) {
+        amount += 25; // Importo fisso gettone
+    }
+    
+    return amount;
+}
+
+/**
+ * Genera l'HTML del report di stampa in stile planner
+ */
+function generatePlannerStyleReportHTML(monthName, extraData) {
+    const totals = calculateExtraTotals(extraData);
+    
+    return `
+        <!DOCTYPE html>
+        <html lang="it">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Report Extra - ${monthName}</title>
+            <style>
+                ${getExtraPrintStyles()}
+                ${getPlannerPrintStyles()}
+            </style>
+        </head>
+        <body>
+            <div class="extra-print-report">
+                ${generateReportHeader(monthName)}
+                ${generateSymbolsSummary(extraData)}
+                ${generatePlannerStyleTable(extraData)}
+                ${generateHoursSummary(extraData)}
+                ${generateReportLegend()}
+                ${generateReportFooter()}
+            </div>
+        </body>
+        </html>
+    `;
+}
+
+/**
+ * Genera l'header del report
+ */
+function generateReportHeader(monthName) {
+    return `
+        <div class="extra-print-header">
+            <h1 class="extra-print-title">REPORT EXTRA PERSONALE</h1>
+            <p class="extra-print-period">Periodo: ${monthName}</p>
+        </div>
+    `;
+}
+
+/**
+ * Genera il riassunto dei simboli
+ */
+function generateSymbolsSummary(extraData) {
+    const symbolCounts = {
+        'P': 0, // Prolungamento
+        'G': 0, // Gettone
+        '+': 0, // Straordinario
+        'R': 0  // Rientro
+    };
+    
+    extraData.forEach(extra => {
+        if (extra.type === 'Prolungamento') symbolCounts['P']++;
+        else if (extra.type === 'Straordinario') symbolCounts['+']++;
+        else if (extra.type === 'Rientro') symbolCounts['R']++;
+        if (extra.gettone) symbolCounts['G']++;
+    });
+    
+    const summaryItems = Object.entries(symbolCounts)
+        .filter(([symbol, count]) => count > 0)
+        .map(([symbol, count]) => `${symbol}: ${count}`)
+        .join(' | ');
+    
+    return summaryItems ? `
+        <div class="symbols-summary">
+            <p><strong>Riassunto simboli:</strong> ${summaryItems}</p>
+        </div>
+    ` : '';
+}
+
+/**
+ * Genera la tabella principale del report
+ */
+function generateReportTable(extraData) {
+    const tableRows = extraData.map(extra => {
+        const typeClass = getExtraTypeClass(extra.type);
+        const formattedDate = extra.date.toLocaleDateString('it-IT');
+        const formattedAmount = extra.amount.toFixed(2);
+        const gettoneIcon = extra.gettone ? '<span class="gettone-icon">🔔</span>' : '';
+        const gettoneClass = extra.gettone ? 'has-gettone' : '';
+        
+        return `
+            <tr class="${typeClass} ${gettoneClass}">
+                <td class="extra-print-operator">${extra.operator}</td>
+                <td class="extra-print-date">${formattedDate}</td>
+                <td class="extra-print-type">${extra.type}</td>
+                <td class="extra-print-shift">${extra.shift}</td>
+                <td class="extra-print-hours">${extra.hours}h</td>
+                <td class="extra-print-gettone">${gettoneIcon}</td>
+                <td class="extra-print-amount">€ ${formattedAmount}</td>
+                <td class="extra-print-notes">${extra.notes}</td>
+            </tr>
+        `;
+    }).join('');
+    
+    return `
+        <table class="extra-print-table">
+            <thead>
+                <tr>
+                    <th class="extra-print-operator">Operatore</th>
+                    <th class="extra-print-date">Data</th>
+                    <th class="extra-print-type">Tipologia</th>
+                    <th class="extra-print-shift">Turno</th>
+                    <th class="extra-print-hours">Ore</th>
+                    <th class="extra-print-gettone">Gettone</th>
+                    <th class="extra-print-amount">Importo</th>
+                    <th class="extra-print-notes">Note</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${tableRows}
+            </tbody>
+        </table>
+    `;
+}
+
+/**
+ * Calcola i totali per tipologia
+ */
+function calculateExtraTotals(extraData) {
+    const totals = {
+        Straordinario: { count: 0, hours: 0, amount: 0 },
+        Prolungamento: { count: 0, hours: 0, amount: 0 },
+        Rientro: { count: 0, hours: 0, amount: 0 },
+        Gettone: { count: 0, hours: 0, amount: 0 },
+        Total: { count: 0, hours: 0, amount: 0 }
+    };
+    
+    extraData.forEach(extra => {
+        const type = extra.type || 'Altro';
+        if (!totals[type]) {
+            totals[type] = { count: 0, hours: 0, amount: 0 };
+        }
+        
+        totals[type].count++;
+        totals[type].hours += parseFloat(extra.hours) || 0;
+        totals[type].amount += extra.amount;
+        
+        totals.Total.count++;
+        totals.Total.hours += parseFloat(extra.hours) || 0;
+        totals.Total.amount += extra.amount;
+        
+        if (extra.gettone) {
+            totals.Gettone.count++;
+        }
+    });
+    
+    return totals;
+}
+
+/**
+ * Genera il riassunto delle ore extra
+ */
+function generateHoursSummary(extraData) {
+    const totals = calculateExtraTotals(extraData);
+    
+    const summaryRows = Object.entries(totals)
+        .filter(([key]) => key !== 'Total' && totals[key].count > 0)
+        .map(([type, data]) => {
+            const typeClass = getExtraTypeClass(type);
+            return `
+                <tr class="${typeClass}">
+                    <td class="extra-print-type">${type}</td>
+                    <td class="extra-print-hours">${data.count}</td>
+                    <td class="extra-print-hours">${data.hours.toFixed(1)}h</td>
+                </tr>
+            `;
+        }).join('');
+    
+    return `
+        <div class="hours-summary">
+            <h3>Conteggio Ore Extra</h3>
+            <table class="extra-print-table">
+                <thead>
+                    <tr>
+                        <th class="extra-print-type">Tipologia</th>
+                        <th class="extra-print-hours">Quantità</th>
+                        <th class="extra-print-hours">Ore Totali</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${summaryRows}
+                    <tr class="extra-print-total-row">
+                        <td class="extra-print-type"><strong>TOTALE GENERALE</strong></td>
+                        <td class="extra-print-hours"><strong>${totals.Total.count}</strong></td>
+                        <td class="extra-print-hours"><strong>${totals.Total.hours.toFixed(1)}h</strong></td>
+                    </tr>
+                </tbody>
+            </table>
+            <div class="total-hours-summary">
+                <p><strong>Totale complessivo ore extra: ${totals.Total.hours.toFixed(1)}h</strong></p>
+            </div>
+        </div>
+    `;
+}
+
+/**
+ * Genera una tabella in stile planner per il PDF degli extra
+ */
+function generatePlannerStyleTable(extraData) {
+    if (!extraData || extraData.length === 0) {
+        return '<p class="text-center text-gray-500 py-4">Nessun dato extra trovato per il periodo selezionato.</p>';
+    }
+
+    // Raggruppa i dati per operatore e giorno
+    const groupedData = {};
+    const allDays = new Set();
+    const operators = new Set();
+
+    extraData.forEach(extra => {
+        const dateKey = extra.date.toLocaleDateString('it-IT');
+        const key = `${extra.operator}-${dateKey}`;
+        
+        if (!groupedData[key]) {
+            groupedData[key] = {
+                operator: extra.operator,
+                date: dateKey,
+                shift: extra.shift,
+                extras: []
+            };
+        }
+        
+        groupedData[key].extras.push(extra);
+        allDays.add(dateKey);
+        operators.add(extra.operator);
+    });
+
+    // Ordina giorni e operatori
+    const sortedDays = Array.from(allDays).sort((a, b) => {
+        const dateA = new Date(a.split('/').reverse().join('-'));
+        const dateB = new Date(b.split('/').reverse().join('-'));
+        return dateA - dateB;
+    });
+    const sortedOperators = Array.from(operators).sort();
+
+    // Genera header della tabella
+    let tableHTML = `
+        <table class="planner-style-table">
+            <thead>
+                <tr>
+                    <th class="operator-header">Operatore</th>`;
+    
+    // Aggiungi header per ogni giorno
+    sortedDays.forEach(day => {
+        const dayNumber = day.split('/')[0];
+        const dayOfWeek = new Date(day.split('/').reverse().join('-')).toLocaleDateString('it-IT', { weekday: 'short' });
+        tableHTML += `<th class="day-header">${dayNumber}<br><small>${dayOfWeek}</small></th>`;
+    });
+    
+    tableHTML += `
+                </tr>
+            </thead>
+            <tbody>`;
+    
+    // Calcola riassunti per ogni operatore
+    const operatorSummaries = {};
+    sortedOperators.forEach(operator => {
+        operatorSummaries[operator] = {
+            straordinario: 0,
+            prolungamento: 0,
+            rientro: 0,
+            gettone: 0,
+            totalExtraHours: 0  // Aggiunto calcolo totale ore straordinarie
+        };
+    });
+    
+    extraData.forEach(extra => {
+        const summary = operatorSummaries[extra.operator];
+        if (summary) {
+            if (extra.type === 'Straordinario') summary.straordinario++;
+            else if (extra.type === 'Prolungamento') summary.prolungamento++;
+            else if (extra.type === 'Rientro') summary.rientro++;
+            if (extra.gettone) summary.gettone++;
+            
+            // Accumula le ore straordinarie totali
+            if (extra.hours && extra.hours > 0) {
+                summary.totalExtraHours += extra.hours;
+            }
+        }
+    });
+    
+    // Genera righe per ogni operatore
+    sortedOperators.forEach(operator => {
+        const summary = operatorSummaries[operator];
+        let summaryBadges = '';
+        
+        if (summary.straordinario > 0) {
+            summaryBadges += `<span class="summary-badge straordinario">+ ${summary.straordinario}</span>`;
+        }
+        if (summary.prolungamento > 0) {
+            summaryBadges += `<span class="summary-badge prolungamento">P ${summary.prolungamento}</span>`;
+        }
+        if (summary.rientro > 0) {
+            summaryBadges += `<span class="summary-badge rientro">R ${summary.rientro}</span>`;
+        }
+        if (summary.gettone > 0) {
+            summaryBadges += `<span class="summary-badge gettone">G ${summary.gettone}</span>`;
+        }
+        
+        // Aggiungi totale ore straordinarie se presente
+        let totalHoursDisplay = '';
+        if (summary.totalExtraHours > 0) {
+            totalHoursDisplay = `<div class="operator-total-hours">Totale: ${summary.totalExtraHours.toFixed(1)}h</div>`;
+        }
+        
+        const operatorContent = summaryBadges ? 
+            `${operator}<div class="operator-summary">${summaryBadges}</div>${totalHoursDisplay}` : 
+            `${operator}${totalHoursDisplay}`;
+        
+        tableHTML += `
+                <tr>
+                    <td class="operator-cell">${operatorContent}</td>`;
+        
+        // Genera celle per ogni giorno
+        sortedDays.forEach(day => {
+            const key = `${operator}-${day}`;
+            const cellData = groupedData[key];
+            
+            if (cellData && cellData.extras.length > 0) {
+                let cellContent = '';
+                let cellClasses = 'planner-cell has-extra';
+                
+                // Aggiungi turno se presente
+                if (cellData.shift) {
+                    cellContent += `<div class="shift-name">${cellData.shift}</div>`;
+                }
+                
+                // Aggiungi indicatori extra
+                let indicators = '';
+                cellData.extras.forEach(extra => {
+                    // Indicatori simbolici come nel planner originale
+                    if (extra.type === 'Straordinario') {
+                        indicators += '<span class="extra-indicator straordinario">+</span>';
+                        cellClasses += ' has-straordinario';
+                    } else if (extra.type === 'Prolungamento') {
+                        indicators += '<span class="extra-indicator prolungamento">P</span>';
+                        cellClasses += ' has-prolungamento';
+                    } else if (extra.type === 'Rientro') {
+                        indicators += '<span class="extra-indicator rientro">R</span>';
+                        cellClasses += ' has-rientro';
+                    }
+                    
+                    if (extra.gettone) {
+                        indicators += '<span class="extra-indicator gettone">G</span>';
+                        cellClasses += ' has-gettone';
+                    }
+                });
+                
+                if (indicators) {
+                    cellContent += `<div class="extra-indicators">${indicators}</div>`;
+                }
+                
+                // Aggiungi dettagli extra - posizionati sotto agli orari
+                let extraDetails = '';
+                cellData.extras.forEach(extra => {
+                    if (extra.hours > 0) {
+                        extraDetails += `<div class="extra-details-block">`;
+                        if (extra.startTime && extra.endTime) {
+                            extraDetails += `<div class="extra-time-line">${extra.startTime}-${extra.endTime}</div>`;
+                        }
+                        extraDetails += `<div class="extra-hours-line">Straordinario: ${extra.hours}h</div>`;
+                        extraDetails += `</div>`;
+                    }
+                });
+                
+                if (extraDetails) {
+                    cellContent += extraDetails;
+                }
+                
+                tableHTML += `<td class="${cellClasses}">${cellContent}</td>`;
+            } else {
+                tableHTML += `<td class="planner-cell empty"></td>`;
+            }
+        });
+        
+        tableHTML += `</tr>`;
+    });
+    
+    tableHTML += `
+            </tbody>
+        </table>`;
+    
+    return tableHTML;
+}
+
+/**
+ * Genera la legenda del report
+ */
+function generateReportLegend() {
+    return `
+        <div class="extra-print-legend">
+            <h3>Legenda Tipologie Extra</h3>
+            <div class="legend-grid">
+                <div class="legend-item legend-straordinario">
+                    <div class="legend-color"></div>
+                    <span class="legend-text">Straordinario - Ore aggiuntive oltre l'orario normale</span>
+                </div>
+                <div class="legend-item legend-prolungamento">
+                    <div class="legend-color"></div>
+                    <span class="legend-text">Prolungamento - Estensione del turno esistente</span>
+                </div>
+                <div class="legend-item legend-rientro">
+                    <div class="legend-color"></div>
+                    <span class="legend-text">Rientro - Turno anticipato o aggiuntivo</span>
+                </div>
+                <div class="legend-item legend-gettone">
+                    <div class="legend-color"></div>
+                    <span class="legend-text">🔔 Gettone di chiamata - Compenso per reperibilità</span>
+                </div>
+            </div>
+            <div style="margin-top: 15px; padding: 10px; background-color: #f9f9f9; border: 1px solid #ddd;">
+                <strong>Note:</strong> Le righe con bordo blu a sinistra indicano turni con gettone di chiamata.
+                L'icona 🔔 nella colonna "Gettone" conferma la presenza del compenso per reperibilità.
+            </div>
+        </div>
+    `;
+}
+
+/**
+ * Genera il footer del report
+ */
+function generateReportFooter() {
+    const now = new Date();
+    const timestamp = now.toLocaleDateString('it-IT') + ' ' + now.toLocaleTimeString('it-IT');
+    
+    return `
+        <div class="extra-print-footer">
+            <p>Report generato il ${timestamp}</p>
+            <p>Sistema di Gestione Turni - Casa di Riposo</p>
+        </div>
+    `;
+}
+
+/**
+ * Restituisce la classe CSS per il tipo di extra
+ */
+function getExtraTypeClass(type) {
+    switch (type) {
+        case 'Straordinario':
+            return 'extra-type-straordinario';
+        case 'Prolungamento':
+            return 'extra-type-prolungamento';
+        case 'Rientro':
+            return 'extra-type-rientro';
+        case 'Gettone':
+            return 'extra-type-gettone';
+        default:
+            return '';
+    }
+}
+
+/**
+ * Restituisce gli stili CSS per la stampa
+ */
+function getExtraPrintStyles() {
+    // Restituisce una versione semplificata degli stili CSS per la stampa
+    return `
+        body { font-family: Arial, sans-serif; font-size: 12pt; line-height: 1.4; color: #000; background: #fff; margin: 0; padding: 20px; }
+        .extra-print-report { width: 100%; max-width: none; margin: 0; padding: 0; }
+        .extra-print-header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #333; padding-bottom: 15px; }
+        .extra-print-title { font-size: 18pt; font-weight: bold; margin: 0 0 10px 0; color: #333; }
+        .extra-print-period { font-size: 14pt; color: #666; margin: 0; }
+        .extra-print-table { width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 10pt; }
+        .extra-print-table th, .extra-print-table td { border: 1px solid #333; padding: 6px 4px; text-align: left; vertical-align: top; }
+        .extra-print-table th { background-color: #f0f0f0; font-weight: bold; text-align: center; }
+        .extra-type-straordinario { background-color: #ffebee; }
+        .extra-type-prolungamento { background-color: #e8f5e8; }
+        .extra-type-rientro { background-color: #fff3e0; }
+        .has-gettone { border-left: 4px solid #2196F3 !important; }
+        .extra-print-operator { font-weight: bold; width: 18%; }
+        .extra-print-date { width: 12%; text-align: center; }
+        .extra-print-type { width: 15%; text-align: center; font-weight: bold; }
+        .extra-print-shift { width: 12%; text-align: center; font-size: 9pt; }
+        .extra-print-hours { width: 10%; text-align: center; }
+        .extra-print-gettone { width: 8%; text-align: center; }
+        .extra-print-amount { width: 12%; text-align: right; font-weight: bold; }
+        .extra-print-notes { width: 13%; font-size: 9pt; }
+        .gettone-icon { font-size: 14pt; color: #2196F3; }
+        .extra-print-totals { margin-top: 20px; border-top: 2px solid #333; padding-top: 15px; }
+        .extra-print-total-row { background-color: #f5f5f5; font-weight: bold; }
+        .extra-print-legend { margin-top: 30px; border-top: 1px solid #ccc; padding-top: 20px; }
+        .extra-print-legend h3 { font-size: 14pt; margin: 0 0 15px 0; color: #333; }
+        .legend-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 20px; }
+        .legend-item { display: flex; align-items: center; padding: 8px; border: 1px solid #ddd; }
+        .legend-color { width: 20px; height: 20px; margin-right: 10px; border: 1px solid #333; }
+        .legend-straordinario .legend-color { background-color: #ffebee; }
+        .legend-prolungamento .legend-color { background-color: #e8f5e8; }
+        .legend-rientro .legend-color { background-color: #fff3e0; }
+        .legend-gettone .legend-color { background-color: #2196F3; }
+        .legend-text { font-weight: bold; font-size: 11pt; }
+        .extra-print-footer { margin-top: 30px; text-align: center; font-size: 10pt; color: #666; border-top: 1px solid #ccc; padding-top: 15px; }
+        @media print {
+            body { margin: 0; padding: 15px; }
+            .extra-print-table { font-size: 9pt; }
+            .extra-print-table th, .extra-print-table td { padding: 4px 3px; }
+        }
+    `;
+}
+
+/**
+ * Restituisce gli stili CSS specifici per il layout planner nel PDF
+ */
+function getPlannerPrintStyles() {
+    return `
+        .planner-style-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 1px;
+            margin: 20px 0;
+            font-size: 9pt;
+            table-layout: fixed;
+        }
+        
+        .planner-style-table th,
+        .planner-style-table td {
+            border: 1px solid #333;
+            padding: 4px 2px;
+            vertical-align: top;
+            text-align: center;
+            min-height: 40px;
+            height: 40px;
+            position: relative;
+        }
+        
+        .operator-header {
+            background-color: #f0f0f0;
+            font-weight: bold;
+            width: 120px;
+            text-align: left;
+            padding-left: 8px;
+        }
+        
+        .day-header {
+            background-color: #f0f0f0;
+            font-weight: bold;
+            width: 36px;
+            font-size: 8pt;
+        }
+        
+        .day-header small {
+            font-size: 7pt;
+            color: #666;
+            display: block;
+        }
+        
+        .operator-cell {
+            background-color: #f9f9f9;
+            font-weight: bold;
+            text-align: left;
+            padding-left: 8px;
+            font-size: 8pt;
+        }
+        
+        .operator-summary {
+            margin-top: 4px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 2px;
+            justify-content: center;
+        }
+        
+        .summary-badge {
+            display: inline-block;
+            padding: 1px 4px;
+            border-radius: 3px;
+            font-size: 6pt;
+            font-weight: bold;
+            color: white;
+            text-align: center;
+            min-width: 16px;
+        }
+        
+        .summary-badge.straordinario {
+            background-color: #f44336;
+        }
+        
+        .summary-badge.prolungamento {
+            background-color: #4caf50;
+        }
+        
+        .summary-badge.rientro {
+            background-color: #ff9800;
+        }
+        
+        .summary-badge.gettone {
+            background-color: #2196f3;
+        }
+        
+        .planner-cell {
+            background-color: #fff;
+            font-size: 7pt;
+            line-height: 1.2;
+        }
+        
+        .planner-cell.empty {
+            background-color: #fafafa;
+        }
+        
+        .planner-cell.has-extra {
+            background-color: #fff;
+        }
+        
+        .shift-name {
+            font-weight: bold;
+            font-size: 7pt;
+            margin-bottom: 2px;
+            color: #333;
+        }
+        
+        .extra-indicators {
+            margin: 2px 0;
+            display: flex;
+            justify-content: center;
+            gap: 2px;
+            flex-wrap: wrap;
+        }
+        
+        .extra-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 2px;
+            font-size: 7pt;
+            font-weight: bold;
+            line-height: 12px;
+            text-align: center;
+            color: white;
+        }
+        
+        .extra-indicator.straordinario {
+            background-color: #f44336;
+        }
+        
+        .extra-indicator.prolungamento {
+            background-color: #4caf50;
+        }
+        
+        .extra-indicator.rientro {
+            background-color: #ff9800;
+        }
+        
+        .extra-indicator.gettone {
+            background-color: #2196f3;
+        }
+        
+        .extra-details {
+            margin-top: 2px;
+            font-size: 6pt;
+            color: #666;
+            line-height: 1.1;
+        }
+        
+        .extra-time {
+            display: block;
+            font-weight: bold;
+        }
+        
+        .extra-hours {
+            display: block;
+            color: #333;
+            font-weight: bold;
+        }
+        
+        .extra-details-block {
+            margin-top: 4px;
+            padding: 2px 4px;
+            background-color: #fff3e0;
+            border-radius: 3px;
+            border-left: 2px solid #ff9800;
+        }
+        
+        .extra-time-line {
+            font-size: 7pt;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 1px;
+        }
+        
+        .extra-hours-line {
+            font-size: 7pt;
+            color: #d84315;
+            font-weight: bold;
+        }
+        
+        .operator-total-hours {
+            text-align: center;
+            font-size: 8pt;
+            font-weight: bold;
+            color: #1976d2;
+            margin-top: 4px;
+            padding: 2px 4px;
+            background-color: #e3f2fd;
+            border-radius: 3px;
+            border: 1px solid #1976d2;
+        }
+        
+        .planner-cell.has-straordinario {
+            border-left: 3px solid #f44336;
+        }
+        
+        .planner-cell.has-prolungamento {
+            border-left: 3px solid #4caf50;
+        }
+        
+        .planner-cell.has-rientro {
+            border-left: 3px solid #ff9800;
+        }
+        
+        .planner-cell.has-gettone {
+            border-right: 3px solid #2196f3;
+        }
+        
+        @media print {
+            .planner-style-table {
+                font-size: 8pt;
+                border-spacing: 0.5px;
+            }
+            
+            .planner-style-table th,
+            .planner-style-table td {
+                padding: 2px 1px;
+                min-height: 35px;
+                height: 35px;
+            }
+            
+            .extra-indicator {
+                width: 10px;
+                height: 10px;
+                font-size: 6pt;
+                line-height: 10px;
+            }
+            
+            .extra-details {
+                font-size: 5pt;
+            }
+            
+            .shift-name {
+                font-size: 6pt;
+            }
+            
+            .day-header {
+                width: 30px;
+            }
+            
+            .summary-badge {
+                padding: 1px 2px;
+                font-size: 5pt;
+                min-width: 12px;
+            }
+            
+            .operator-summary {
+                margin-top: 2px;
+                gap: 1px;
+            }
+            
+            .extra-details-block {
+                margin-top: 2px;
+                padding: 1px 2px;
+                background-color: #f5f5f5;
+                border-radius: 2px;
+                border-left: 1px solid #ff9800;
+            }
+            
+            .extra-time-line {
+                font-size: 5pt;
+                font-weight: bold;
+                margin-bottom: 0.5px;
+            }
+            
+            .extra-hours-line {
+                font-size: 5pt;
+                color: #333;
+                font-weight: bold;
+            }
+            
+            .operator-total-hours {
+                text-align: center;
+                font-size: 6pt;
+                font-weight: bold;
+                color: #333;
+                margin-top: 2px;
+                padding: 1px 2px;
+                background-color: #f0f0f0;
+                border-radius: 2px;
+                border: 1px solid #666;
+            }
+        }
+        
+        .symbols-summary {
+            margin: 15px 0;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+        }
+        
+        .symbols-summary p {
+            margin: 0;
+            font-size: 11pt;
+            text-align: center;
+        }
+        
+        .hours-summary {
+            margin: 20px 0;
+        }
+        
+        .hours-summary h3 {
+            margin: 0 0 10px 0;
+            font-size: 14pt;
+            text-align: center;
+            color: #333;
+        }
+        
+        .total-hours-summary {
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #f0f8ff;
+            border: 2px solid #4caf50;
+            border-radius: 5px;
+            text-align: center;
+        }
+        
+        .total-hours-summary p {
+            margin: 0;
+            font-size: 12pt;
+            color: #2e7d32;
+        }
+        
+        @media print {
+            .symbols-summary {
+                margin: 10px 0;
+                padding: 8px;
+            }
+            
+            .symbols-summary p {
+                font-size: 10pt;
+            }
+            
+            .hours-summary h3 {
+                 font-size: 12pt;
+                 margin-bottom: 8px;
+             }
+             
+             .total-hours-summary {
+                 margin-top: 10px;
+                 padding: 8px;
+             }
+             
+             .total-hours-summary p {
+                 font-size: 11pt;
+             }
+         }
+    `;
+}
+
+/**
+ * Crea e apre la finestra di stampa
+ */
+function createPrintWindow(htmlContent) {
+    try {
+        const printWindow = window.open('', '_blank', 'width=800,height=600');
+        
+        if (printWindow) {
+            printWindow.document.write(htmlContent);
+            printWindow.document.close();
+            
+            // Finestra aperta senza avvio automatico della stampa
+            // L'utente può stampare manualmente usando Ctrl+P o il menu del browser
+        } else {
+            showToast('Impossibile aprire la finestra di stampa. Verifica le impostazioni del browser e consenti i popup.', 'error');
+        }
+    } catch (error) {
+        console.error('Errore durante l\'apertura della finestra di stampa:', error);
+        showToast('Errore durante l\'apertura della finestra di stampa.', 'error');
+    }
+}

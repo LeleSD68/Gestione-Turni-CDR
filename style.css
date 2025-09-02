@@ -174,7 +174,7 @@
     --header-height: 1.8rem; /* Aumentato per migliorare leggibilità */
     
     /* Nuove variabili per personalizzazione */
-    --grid-density: 0.85; /* Ridotto da 1 per maggiore compattezza */
+    --grid-density: 0.55; /* Ridotto da 1 per maggiore compattezza */
     --text-scale: 1.2; /* Ridotto da 1.4 per bilanciare la compattezza */
     --border-width: 0px; /* Rimosso per eliminare bordi a schermo */
     --border-radius: 0.25rem;
@@ -500,7 +500,7 @@ input:checked + .toggle-bg-sm {
     position: sticky;
     top: 0;
     z-index: 40;
-    background: rgba(249, 250, 251, 0.95);
+    background: rgba(255, 255, 255, 0.95);
     backdrop-filter: blur(8px);
     border-bottom: 1px solid rgba(229, 231, 235, 0.8);
 }
@@ -708,7 +708,41 @@ th[data-day-col].status-bg-red div { color: #991b1b; }
 .planner-cell { 
     font-size: calc(var(--cell-font-size) * var(--text-scale) * var(--auto-scale-factor) + 1px); /* Aggiunto +1px */
 }
-table.show-extra-details .planner-cell { min-height: 70px; vertical-align: top; }
+/* Ottimizzazioni per tabella con dettagli extra attivi */
+table.show-extra-details {
+    table-layout: auto; /* Permette adattamento automatico larghezza colonne */
+}
+
+table.show-extra-details .planner-cell { 
+    vertical-align: top;
+    width: auto; /* Larghezza automatica per adattarsi al contenuto */
+    min-width: 120px; /* Larghezza minima per leggibilità */
+    max-width: 200px; /* Larghezza massima per evitare espansione eccessiva */
+    height: auto !important;
+}
+
+/* Uniforma altezza righe per allineamento verticale corretto */
+table.show-extra-details tbody tr {
+    height: auto !important;
+    min-height: 60px;
+}
+
+/* Assicura allineamento uniforme per tutte le celle della riga */
+table.show-extra-details .planner-cell .base-cell {
+    min-height: 60px;
+    height: auto;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 4px;
+    box-sizing: border-box;
+}
+
+/* Celle senza dettagli extra mantengono centratura */
+table.show-extra-details .planner-cell:not(.extra-details-visible) .base-cell {
+    align-items: center;
+    justify-content: center;
+}
 
 /* Celle del planner più compatte */
 .base-cell {
@@ -792,7 +826,7 @@ table.show-extra-details .planner-cell { min-height: 70px; vertical-align: top; 
 #mini-menu a { display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 0.75rem; font-size: 0.875rem; border-radius: 0.375rem; transition: background-color 0.2s; }
 #mini-menu a:hover { background-color: #f3f4f6; }
 #mini-menu a.danger:hover { background-color: #fee2e2; }
-#mini-menu a[data-action="edit-notification"] { color: #7c3aed; }
+
 #mini-menu a[data-action="change"] { color: #2563eb; }
 #mini-menu a[data-action="swap"]   { color: #d97706; }
 #mini-menu a[data-action="period"] { color: #16a34a; }
@@ -1256,36 +1290,152 @@ table.assignment-mode-active .planner-cell.non-operative-cell * {
     border-top: 1px solid rgba(0,0,0,0.1);
     color: #4b5563;
 }
+/* Ottimizzazioni per celle con dettagli extra visibili */
 .planner-cell.extra-details-visible .base-cell {
-    min-height: 70px; 
     vertical-align: top;
     justify-content: flex-start;
+    align-items: flex-start;
+    padding: 6px 8px; /* Padding aumentato per migliore leggibilità */
+    text-align: left;
+    overflow: hidden;
+    word-wrap: break-word;
+    height: auto; /* Altezza automatica basata sul contenuto */
 }
+
 .planner-cell.extra-details-visible .cell-extra-details {
     display: block;
+    width: 100%;
+    margin-top: 4px;
+    font-size: 0.75rem;
+    line-height: 1.3;
 }
 .planner-cell.extra-bg-straordinario > .base-cell { background-color: #fef9c3 !important; }
 .planner-cell.extra-bg-prolungamento > .base-cell { background-color: #ede9fe !important; }
 .planner-cell.extra-bg-rientro > .base-cell { background-color: #e0f2fe !important; }
 
+/* Miglioramenti per le linee di dettaglio extra */
 .extra-detail-line {
     white-space: normal;
+    margin-bottom: 2px;
+    font-size: 0.7rem;
+    line-height: 1.2;
+    word-break: break-word;
+    overflow-wrap: break-word;
 }
+
+.extra-detail-line:last-child {
+    margin-bottom: 0;
+}
+
+.extra-detail-line strong {
+    font-weight: 600;
+    color: #374151;
+    font-size: 0.75rem;
+}
+
 .extra-detail-line.note {
     font-style: italic;
     color: #6b7280;
+    font-size: 0.65rem;
+    margin-top: 3px;
+    padding-top: 2px;
+    border-top: 1px solid rgba(0,0,0,0.1);
 }
+
+/* Layout orizzontale per dettagli extra */
+.extra-detail-line.horizontal-layout {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-bottom: 2px;
+    justify-content: flex-start;
+}
+
+.extra-detail-line.horizontal-layout:last-child {
+    margin-bottom: 0;
+}
+
+/* Stile per elementi inline nelle righe orizzontali */
+.extra-detail-line.horizontal-layout .extra-hours-display {
+    font-weight: 600;
+    color: #dc2626;
+    margin: 0;
+}
+
+.extra-detail-line.horizontal-layout .extra-type-badge {
+    margin-right: 4px;
+    margin-left: 0;
+}
+
+.extra-detail-line.horizontal-layout .gettone-badge {
+    margin-left: 2px;
+}
+
+.extra-detail-line.horizontal-layout.note {
+    border-top: none;
+    margin-top: 2px;
+    padding-top: 0;
+}
+/* Badge e indicatori migliorati per dettagli extra */
 .gettone-badge {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 14px;
-    height: 14px;
+    width: 16px;
+    height: 16px;
     border-radius: 50%;
     background-color: #eab308;
     color: black;
-    font-size: 9px;
+    font-size: 10px;
     font-weight: bold;
+    margin-left: 4px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+/* Indicatori di tipo extra migliorati */
+.extra-type-badge {
+    display: inline-block;
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-size: 0.6rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-right: 4px;
+}
+
+.extra-type-badge.straordinario {
+    background-color: #fef3c7;
+    color: #92400e;
+    border: 1px solid #f59e0b;
+}
+
+.extra-type-badge.prolungamento {
+    background-color: #ede9fe;
+    color: #6b21a8;
+    border: 1px solid #a855f7;
+}
+
+.extra-type-badge.rientro {
+    background-color: #e0f2fe;
+    color: #0c4a6e;
+    border: 1px solid #0ea5e9;
+}
+
+/* Miglioramenti per ore extra */
+.extra-hours-display {
+    font-weight: 600;
+    color: #dc2626;
+    font-size: 0.7rem;
+    margin-top: 2px;
+}
+
+/* Separatori visivi per dettagli extra */
+.extra-detail-separator {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(0,0,0,0.1), transparent);
+    margin: 3px 0;
 }
 
 #operator-info-panel {
@@ -2135,6 +2285,370 @@ tr:hover .focus-mode-btn {
         height: 1.8rem !important;
         min-height: 1.8rem !important;
         max-height: 1.8rem !important;
+    }
+}
+
+/* =============================================================== */
+/* NUOVE MEDIA QUERIES SPECIFICHE PER MOBILE PLANNER */
+/* =============================================================== */
+
+/* Tablet Portrait e Mobile Landscape */
+@media (max-width: 768px) and (orientation: landscape) {
+    .planner-container-wrapper {
+        overflow-x: auto;
+        overflow-y: hidden;
+    }
+    
+    #planner-table {
+        min-width: 100%;
+        table-layout: fixed;
+    }
+    
+    /* Colonna operatori più stretta su mobile landscape */
+    #planner-table td.sticky, 
+    #planner-table th.sticky {
+        min-width: 200px !important;
+        max-width: 200px !important;
+        width: 200px !important;
+    }
+    
+    /* Mostra solo cognomi su mobile */
+    .operator-name-cell span {
+        font-size: 0.75rem;
+    }
+}
+
+/* Mobile Portrait - Ottimizzazioni specifiche */
+@media (max-width: 480px) {
+    :root {
+        --auto-scale-factor: 0.6;
+        --min-cell-width: 24px;
+        --cell-height: 0.8rem;
+        --cell-font-size: 0.65rem;
+        --cell-padding: 2px;
+    }
+    
+    /* Ottimizzazioni specifiche per dettagli extra su mobile */
+    table.show-extra-details .planner-cell {
+        min-width: 140px !important;
+        max-width: 180px !important;
+        height: auto !important;
+    }
+    
+    /* Uniforma altezza righe su mobile */
+    table.show-extra-details tbody tr {
+        height: auto !important;
+        min-height: 50px;
+    }
+    
+    /* Allineamento uniforme celle su mobile */
+    table.show-extra-details .planner-cell .base-cell {
+        min-height: 50px;
+        height: auto;
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+        padding: 3px;
+        box-sizing: border-box;
+    }
+    
+    /* Celle senza extra mantengono centratura su mobile */
+    table.show-extra-details .planner-cell:not(.extra-details-visible) .base-cell {
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .planner-cell.extra-details-visible .base-cell {
+        height: auto !important; /* Altezza automatica basata sul contenuto */
+        padding: 4px 6px !important;
+        font-size: 0.6rem !important;
+    }
+    
+    .planner-cell.extra-details-visible .cell-extra-details {
+        font-size: 0.65rem !important;
+        line-height: 1.2 !important;
+    }
+    
+    .extra-detail-line {
+        font-size: 0.6rem !important;
+        margin-bottom: 1px !important;
+    }
+    
+    .extra-detail-line strong {
+        font-size: 0.65rem !important;
+    }
+    
+    .extra-detail-line.note {
+        font-size: 0.55rem !important;
+    }
+    
+    /* Layout orizzontale ottimizzato per mobile */
+    .extra-detail-line.horizontal-layout {
+        gap: 2px !important;
+        flex-wrap: wrap !important;
+    }
+    
+    .extra-detail-line.horizontal-layout .extra-type-badge {
+        font-size: 0.5rem !important;
+        width: 12px !important;
+        height: 12px !important;
+        margin-right: 2px !important;
+    }
+    
+    .extra-detail-line.horizontal-layout .gettone-badge {
+        font-size: 0.5rem !important;
+        width: 12px !important;
+        height: 12px !important;
+        margin-left: 1px !important;
+    }
+    
+    .extra-detail-line.horizontal-layout .extra-hours-display {
+        font-size: 0.55rem !important;
+    }
+    
+    /* Container principale con scroll orizzontale */
+    .planner-container-wrapper {
+        overflow-x: auto;
+        overflow-y: visible;
+        -webkit-overflow-scrolling: touch;
+        scroll-behavior: smooth;
+    }
+    
+    #planner-table {
+        min-width: 800px; /* Larghezza minima per evitare compressione eccessiva */
+        table-layout: fixed;
+    }
+    
+    /* Colonna operatori fissa e ridotta */
+    #planner-table td.sticky, 
+    #planner-table th.sticky {
+        min-width: 120px !important;
+        max-width: 120px !important;
+        width: 120px !important;
+        font-size: 0.7rem;
+        padding: 2px 4px;
+    }
+    
+    /* Colonna ore più stretta */
+    th.sticky-hours, 
+    td.sticky-hours {
+        left: 120px !important; /* Adeguato alla nuova larghezza operatori */
+        min-width: 35px !important;
+        max-width: 35px !important;
+        width: 35px !important;
+        font-size: 0.6rem;
+        padding: 1px 2px;
+    }
+    
+    /* Celle giorni ottimizzate */
+    #planner-table th:not(.sticky):not(.sticky-hours),
+    #planner-table td:not(.sticky):not(.sticky-hours) {
+        min-width: 24px !important;
+        max-width: 24px !important;
+        width: 24px !important;
+        padding: 1px;
+        font-size: 0.6rem;
+    }
+    
+    /* Header giorni più compatto */
+    th[data-day-col] .text-xs {
+        font-size: 0.5rem !important;
+        line-height: 1;
+    }
+    
+    th[data-day-col] .flex.items-center.justify-center {
+        font-size: 0.55rem !important;
+        line-height: 1;
+    }
+    
+    /* Mostra solo cognomi */
+    .operator-name-cell span {
+        font-size: 0.65rem;
+        font-weight: 500;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    
+    /* Nascondi nome, mostra solo cognome */
+    .operator-name-cell span::after {
+        content: attr(data-surname);
+    }
+    
+    /* Controlli operatore più piccoli */
+    .operator-controls {
+        gap: 0.25rem;
+    }
+    
+    .focus-mode-btn {
+        padding: 2px;
+    }
+    
+    .focus-mode-btn svg {
+        width: 12px;
+        height: 12px;
+    }
+    
+    /* Toggle più piccolo */
+    .operator-toggle + .toggle-bg {
+        width: 1.5rem;
+        height: 0.4rem;
+    }
+    
+    .operator-toggle + .toggle-bg:after {
+        height: 0.3rem;
+        width: 0.3rem;
+    }
+    
+    /* Toolbar più compatto */
+    #planner-toolbar {
+        padding: 0.25rem;
+        flex-wrap: wrap;
+        gap: 0.25rem;
+    }
+    
+    .header-toggle-group {
+        font-size: 0.6rem;
+        padding: 0.25rem 0.5rem;
+    }
+    
+    /* Indicatori più piccoli */
+    .mod-indicator,
+    .extra-indicator,
+    .note-indicator,
+    .violation-indicator {
+        font-size: 0.5rem;
+        width: 12px;
+        height: 12px;
+        line-height: 12px;
+    }
+    
+    /* Ore turno più piccole */
+    .shift-hours-display {
+        font-size: 0.5rem;
+        margin-top: 1px;
+    }
+    
+    /* Riassunto copertura più compatto */
+    .coverage-summary-row td {
+        font-size: 0.6rem !important;
+        padding: 0.1rem 0.15rem !important;
+    }
+    
+    /* Barre prestazioni più piccole */
+     .performance-bar {
+         height: 6px;
+         min-width: 15px;
+     }
+     
+     /* Touch-friendly interactions */
+     .planner-cell {
+         min-height: 32px; /* Aumenta area touch */
+         touch-action: manipulation;
+     }
+     
+     /* Migliora l'area di tocco per le celle */
+     .base-cell {
+         min-height: 30px;
+         padding: 4px 2px;
+         cursor: pointer;
+         -webkit-tap-highlight-color: rgba(59, 130, 246, 0.3);
+     }
+     
+     /* Feedback visivo per touch */
+     .base-cell:active {
+         background-color: rgba(59, 130, 246, 0.1) !important;
+         transform: scale(0.98);
+         transition: all 0.1s ease;
+     }
+     
+     /* Menu contestuale mobile-friendly */
+     #mini-menu {
+         min-width: 200px;
+         font-size: 0.9rem;
+     }
+     
+     #mini-menu a {
+         padding: 0.75rem 1rem;
+         min-height: 44px; /* iOS recommended touch target */
+         display: flex;
+         align-items: center;
+     }
+     
+     /* Bottoni toolbar più grandi per touch */
+     .header-toggle-group {
+         min-height: 36px;
+         padding: 0.5rem 0.75rem;
+     }
+     
+     /* Scroll indicators per mobile */
+     .planner-container-wrapper::before {
+         content: '';
+         position: absolute;
+         top: 0;
+         right: 0;
+         width: 20px;
+         height: 100%;
+         background: linear-gradient(to left, rgba(0,0,0,0.1), transparent);
+         pointer-events: none;
+         z-index: 5;
+     }
+     
+     /* Migliora visibilità scroll orizzontale */
+     .planner-container-wrapper::-webkit-scrollbar {
+         height: 8px;
+     }
+     
+     .planner-container-wrapper::-webkit-scrollbar-track {
+         background: #f1f1f1;
+         border-radius: 4px;
+     }
+     
+     .planner-container-wrapper::-webkit-scrollbar-thumb {
+         background: #888;
+         border-radius: 4px;
+     }
+     
+     .planner-container-wrapper::-webkit-scrollbar-thumb:hover {
+         background: #555;
+     }
+ }
+
+/* Mobile Portrait molto piccolo */
+@media (max-width: 360px) {
+    :root {
+        --auto-scale-factor: 0.55;
+        --min-cell-width: 20px;
+        --cell-height: 0.7rem;
+        --cell-font-size: 0.6rem;
+    }
+    
+    /* Colonna operatori ancora più stretta */
+    #planner-table td.sticky, 
+    #planner-table th.sticky {
+        min-width: 100px !important;
+        max-width: 100px !important;
+        width: 100px !important;
+        font-size: 0.65rem;
+    }
+    
+    /* Colonna ore minima */
+    th.sticky-hours, 
+    td.sticky-hours {
+        left: 100px !important;
+        min-width: 30px !important;
+        max-width: 30px !important;
+        width: 30px !important;
+        font-size: 0.55rem;
+    }
+    
+    /* Celle giorni minime */
+    #planner-table th:not(.sticky):not(.sticky-hours),
+    #planner-table td:not(.sticky):not(.sticky-hours) {
+        min-width: 20px !important;
+        max-width: 20px !important;
+        width: 20px !important;
+        font-size: 0.55rem;
     }
 }
 
@@ -3769,5 +4283,769 @@ table.matrix-view-active .matrix-view-notification-row {
     .log-pagination {
         flex-direction: column;
         gap: 12px;
+    }
+}
+
+/* ===================================== */
+/* STILI PER SISTEMA BACKUP AVANZATO */
+/* ===================================== */
+
+.btn-green {
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: white;
+    border: none;
+    transition: all 0.2s ease;
+}
+
+.btn-green:hover {
+    background: linear-gradient(135deg, #059669, #047857);
+    transform: translateY(-1px);
+}
+
+.btn-red {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+    color: white;
+    border: none;
+    transition: all 0.2s ease;
+}
+
+.btn-red:hover {
+    background: linear-gradient(135deg, #dc2626, #b91c1c);
+    transform: translateY(-1px);
+}
+
+.backup-item {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    padding: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: all 0.2s ease;
+}
+
+.backup-item:hover {
+    background: #f9fafb;
+    border-color: #d1d5db;
+}
+
+.backup-item-info {
+    flex: 1;
+    font-size: 0.75rem;
+}
+
+.backup-item-time {
+    font-weight: 600;
+    color: #374151;
+}
+
+.backup-item-type {
+    color: #6b7280;
+    text-transform: capitalize;
+}
+
+.backup-item-actions {
+    display: flex;
+    gap: 4px;
+}
+
+.backup-item-btn {
+    padding: 2px 6px;
+    font-size: 0.7rem;
+    border-radius: 4px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.backup-item-btn.download {
+    background: #3b82f6;
+    color: white;
+}
+
+.backup-item-btn.download:hover {
+    background: #2563eb;
+}
+
+.backup-item-btn.restore {
+    background: #10b981;
+    color: white;
+}
+
+.backup-item-btn.restore:hover {
+    background: #059669;
+}
+
+.backup-item-btn.delete {
+    background: #ef4444;
+    color: white;
+}
+
+.backup-item-btn.delete:hover {
+    background: #dc2626;
+}
+
+#backup-panel {
+    max-width: 500px;
+}
+
+.backup-progress {
+    width: 100%;
+    height: 4px;
+    background: #e5e7eb;
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 8px;
+}
+
+.backup-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #3b82f6, #1d4ed8);
+    transition: width 0.3s ease;
+    border-radius: 2px;
+}
+
+/* ===== STILI MOBILE E MERGE ===== */
+
+/* Stili per merge mobile */
+.merge-indicator {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    font-size: 12px;
+    background: rgba(0, 123, 255, 0.8);
+    color: white;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+}
+
+.base-cell.merge-mode {
+    border: 2px solid #007bff !important;
+    background-color: rgba(0, 123, 255, 0.1) !important;
+}
+
+/* Classe per dispositivi mobile */
+body.mobile-device {
+    -webkit-text-size-adjust: 100%;
+    -ms-text-size-adjust: 100%;
+}
+
+body.mobile-device .planner-container-wrapper {
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+}
+
+/* Miglioramenti touch per emergenze */
+@media (max-width: 768px) {
+    .emergency-btn {
+        min-height: 48px;
+        min-width: 48px;
+        font-size: 16px;
+        padding: 12px;
+        margin: 4px;
+    }
+    
+    .quick-action-btn {
+        min-height: 44px;
+        padding: 10px 16px;
+        font-size: 14px;
+        border-radius: 8px;
+    }
+    
+    .shift-merge-controls {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 12px;
+        background: rgba(255, 255, 255, 0.95);
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+    
+    /* Ottimizzazioni per modali su mobile */
+    .modal-content {
+        margin: 10px;
+        max-height: calc(100vh - 20px);
+        overflow-y: auto;
+    }
+    
+    /* Pulsanti di azione più grandi */
+    .btn-primary, .btn-secondary, .btn-danger {
+        min-height: 44px;
+        padding: 12px 20px;
+        font-size: 16px;
+    }
+    
+    /* Menu contestuale touch-friendly */
+     #mini-menu {
+         min-width: 200px;
+         padding: 8px 0;
+     }
+     
+     #mini-menu a {
+         padding: 12px 16px;
+         font-size: 16px;
+         line-height: 1.4;
+     }
+     
+     /* Ottimizzazioni leggibilità mobile */
+     .planner-cell .shift-hours {
+         font-size: 10px !important;
+         font-weight: 600;
+         line-height: 1.2;
+     }
+     
+     .planner-cell .turno-badge {
+         font-size: 9px !important;
+         padding: 1px 3px;
+         border-radius: 3px;
+     }
+     
+     .cell-indicator {
+         font-size: 8px !important;
+         width: 12px;
+         height: 12px;
+         line-height: 12px;
+     }
+     
+     .coverage-indicator {
+         font-size: 10px !important;
+         padding: 1px 2px;
+     }
+     
+     /* Miglioramenti per simboli modifiche */
+     .mod-symbol {
+         font-size: 10px !important;
+         width: 14px;
+         height: 14px;
+         line-height: 14px;
+     }
+     
+     /* Ottimizzazioni header tabella */
+     th.sticky-hours {
+         font-size: 11px !important;
+         padding: 4px 2px !important;
+     }
+     
+     .operator-name-cell {
+         font-size: 11px !important;
+         line-height: 1.3;
+         padding: 4px 6px !important;
+     }
+     
+     /* Miglioramenti per note e dettagli */
+     .cell-note {
+         font-size: 8px !important;
+         max-width: 100%;
+         overflow: hidden;
+         text-overflow: ellipsis;
+     }
+ }
+ 
+ /* Ottimizzazioni specifiche per schermi molto piccoli */
+ @media (max-width: 360px) {
+     .planner-cell {
+         min-width: 28px !important;
+         font-size: 9px !important;
+         padding: 2px 1px !important;
+     }
+     
+     .operator-name-cell {
+         min-width: 60px !important;
+         font-size: 10px !important;
+     }
+     
+     th.sticky-hours {
+         min-width: 25px !important;
+         font-size: 10px !important;
+     }
+     
+     .shift-hours {
+         font-size: 8px !important;
+     }
+     
+     .turno-badge {
+          font-size: 8px !important;
+          padding: 1px 2px;
+      }
+  }
+  
+  /* Feedback visivo per tap mobile */
+  .tap-feedback {
+      background-color: rgba(0, 123, 255, 0.2) !important;
+      transform: scale(0.98);
+      transition: all 0.15s ease;
+  }
+  
+  /* Ottimizzazioni modali per mobile */
+  .modal.mobile-optimized .modal-content {
+      height: calc(var(--vh, 1vh) * 90);
+      max-height: calc(var(--vh, 1vh) * 90);
+      margin: 5vh auto;
+      border-radius: 12px 12px 0 0;
+  }
+  
+  @media (max-width: 768px) {
+      .modal.mobile-optimized {
+          padding: 0;
+      }
+      
+      .modal.mobile-optimized .modal-content {
+          width: 100%;
+          height: 100vh;
+          max-height: 100vh;
+          margin: 0;
+          border-radius: 0;
+          border: none;
+      }
+      
+      .modal.mobile-optimized .modal-header {
+          position: sticky;
+          top: 0;
+          z-index: 1000;
+          background: white;
+          border-bottom: 1px solid #dee2e6;
+      }
+      
+      .modal.mobile-optimized .modal-body {
+          flex: 1;
+          overflow-y: auto;
+          -webkit-overflow-scrolling: touch;
+      }
+      
+      .modal.mobile-optimized .modal-footer {
+          position: sticky;
+          bottom: 0;
+          background: white;
+          border-top: 1px solid #dee2e6;
+      }
+  }
+
+/* ===== STILI PER STAMPA PDF EXTRA ===== */
+@media print {
+    /* Nascondi elementi non necessari per la stampa */
+    .controls, .filters, .modal, .tooltip, #sidebar {
+        display: none !important;
+    }
+    
+    /* Layout generale per stampa */
+    body {
+        font-family: Arial, sans-serif;
+        font-size: 12pt;
+        line-height: 1.4;
+        color: #000;
+        background: #fff;
+        margin: 0;
+        padding: 20px;
+    }
+    
+    /* Container principale per report extra */
+    .extra-print-report {
+        width: 100%;
+        max-width: none;
+        margin: 0;
+        padding: 0;
+        page-break-inside: avoid;
+    }
+    
+    /* Header del report */
+    .extra-print-header {
+        text-align: center;
+        margin-bottom: 30px;
+        border-bottom: 2px solid #333;
+        padding-bottom: 15px;
+    }
+    
+    .extra-print-title {
+        font-size: 18pt;
+        font-weight: bold;
+        margin: 0 0 10px 0;
+        color: #333;
+    }
+    
+    .extra-print-period {
+        font-size: 14pt;
+        color: #666;
+        margin: 0;
+    }
+    
+    /* Tabella degli extra */
+    .extra-print-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 20px 0;
+        font-size: 11pt;
+    }
+    
+    .extra-print-table th,
+    .extra-print-table td {
+        border: 1px solid #333;
+        padding: 8px 6px;
+        text-align: left;
+        vertical-align: top;
+    }
+    
+    .extra-print-table th {
+        background-color: #f0f0f0 !important;
+        font-weight: bold;
+        text-align: center;
+    }
+    
+    /* Colori distintivi per tipologie extra */
+    .extra-type-straordinario {
+        background-color: #ffebee !important; /* Rosso chiaro */
+    }
+    
+    .extra-type-prolungamento {
+        background-color: #e8f5e8 !important; /* Verde chiaro */
+    }
+    
+    .extra-type-rientro {
+        background-color: #fff3e0 !important; /* Arancione chiaro */
+    }
+    
+    .extra-type-gettone {
+        background-color: #e3f2fd !important; /* Blu chiaro */
+    }
+    
+    /* Stili per celle specifiche */
+    .extra-print-operator {
+        font-weight: bold;
+        width: 20%;
+    }
+    
+    .extra-print-date {
+        width: 15%;
+        text-align: center;
+    }
+    
+    .extra-print-type {
+        width: 20%;
+        text-align: center;
+        font-weight: bold;
+    }
+    
+    .extra-print-hours {
+        width: 15%;
+        text-align: center;
+    }
+    
+    .extra-print-amount {
+        width: 15%;
+        text-align: right;
+        font-weight: bold;
+    }
+    
+    .extra-print-notes {
+        width: 15%;
+        font-size: 10pt;
+    }
+    
+    /* Totali */
+    .extra-print-totals {
+        margin-top: 20px;
+        border-top: 2px solid #333;
+        padding-top: 15px;
+    }
+    
+    .extra-print-total-row {
+        background-color: #f5f5f5 !important;
+        font-weight: bold;
+    }
+    
+    /* Legenda */
+    .extra-print-legend {
+        margin-top: 30px;
+        page-break-inside: avoid;
+        border-top: 1px solid #ccc;
+        padding-top: 20px;
+    }
+    
+    .extra-print-legend h3 {
+        font-size: 14pt;
+        margin: 0 0 15px 0;
+        color: #333;
+    }
+    
+    .legend-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+        margin-bottom: 20px;
+    }
+    
+    .legend-item {
+        display: flex;
+        align-items: center;
+        padding: 8px;
+        border: 1px solid #ddd;
+    }
+    
+    .legend-color {
+        width: 20px;
+        height: 20px;
+        margin-right: 10px;
+        border: 1px solid #333;
+    }
+    
+    .legend-straordinario .legend-color {
+        background-color: #ffebee !important;
+    }
+    
+    .legend-prolungamento .legend-color {
+        background-color: #e8f5e8 !important;
+    }
+    
+    .legend-rientro .legend-color {
+        background-color: #fff3e0 !important;
+    }
+    
+    .legend-gettone .legend-color {
+        background-color: #e3f2fd !important;
+    }
+    
+    .legend-text {
+        font-weight: bold;
+        font-size: 11pt;
+    }
+    
+    /* Footer */
+    .extra-print-footer {
+        margin-top: 30px;
+        text-align: center;
+        font-size: 10pt;
+        color: #666;
+        border-top: 1px solid #ccc;
+        padding-top: 15px;
+    }
+    
+    /* Interruzioni di pagina */
+    .page-break {
+        page-break-before: always;
+    }
+    
+    .no-page-break {
+        page-break-inside: avoid;
+    }
+    
+    /* ===================================== */
+    /* === STILI PLANNER-STYLE TABLE === */
+    /* ===================================== */
+    
+    .planner-style-table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 1px;
+        font-size: 8pt;
+        margin: 0 auto;
+        table-layout: fixed;
+    }
+    
+    .planner-operator-header,
+    .planner-day-header {
+        background-color: #f8fafc;
+        border: 1px solid #e5e7eb;
+        padding: 4px 6px;
+        text-align: center;
+        font-weight: bold;
+        font-size: 7pt;
+    }
+    
+    .planner-operator-header {
+        width: 120px;
+        min-width: 120px;
+        max-width: 120px;
+        position: sticky;
+        left: 0;
+        z-index: 10;
+        background-color: #ffffff;
+    }
+    
+    .planner-day-header {
+        width: 60px;
+        min-width: 60px;
+        max-width: 60px;
+    }
+    
+    .planner-day-number {
+        font-size: 8pt;
+        font-weight: bold;
+        line-height: 1;
+    }
+    
+    .planner-day-name {
+        font-size: 6pt;
+        color: #666;
+        line-height: 1;
+        margin-top: 1px;
+    }
+    
+    .planner-operator-cell {
+        background-color: #ffffff;
+        border: 1px solid #e5e7eb;
+        padding: 4px 6px;
+        text-align: left;
+        font-size: 7pt;
+        font-weight: 500;
+        width: 120px;
+        min-width: 120px;
+        max-width: 120px;
+        position: sticky;
+        left: 0;
+        z-index: 5;
+    }
+    
+    .planner-cell {
+        border: 1px solid #e5e7eb;
+        padding: 2px;
+        text-align: center;
+        vertical-align: top;
+        height: 40px;
+        min-height: 40px;
+        width: 60px;
+        min-width: 60px;
+        max-width: 60px;
+        position: relative;
+        background-color: #ffffff;
+    }
+    
+    .planner-empty-cell {
+        background-color: #f9fafb;
+    }
+    
+    .planner-has-extra {
+        background-color: #fef3c7;
+    }
+    
+    .planner-extra-straordinario {
+        background-color: #ffebee;
+    }
+    
+    .planner-extra-prolungamento {
+        background-color: #e8f5e8;
+    }
+    
+    .planner-extra-rientro {
+        background-color: #fff3e0;
+    }
+    
+    .planner-has-gettone {
+        background-color: #e3f2fd;
+    }
+    
+    .planner-cell-content {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: flex-start;
+        height: 100%;
+        font-size: 6pt;
+        line-height: 1;
+    }
+    
+    .planner-shift-display {
+        font-size: 6pt;
+        font-weight: bold;
+        margin-bottom: 1px;
+        color: #1f2937;
+    }
+    
+    .planner-extra-indicator {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border-radius: 2px;
+        color: white;
+        font-size: 6pt;
+        font-weight: bold;
+        text-align: center;
+        line-height: 10px;
+        margin: 0 1px;
+    }
+    
+    .planner-extra-indicator-straordinario {
+        background-color: #ef4444;
+    }
+    
+    .planner-extra-indicator-prolungamento {
+        background-color: #10b981;
+    }
+    
+    .planner-extra-indicator-rientro {
+        background-color: #f59e0b;
+    }
+    
+    .planner-extra-indicator-gettone {
+        background-color: #3b82f6;
+    }
+    
+    .planner-extra-details-container {
+        margin-top: 1px;
+        font-size: 5pt;
+        line-height: 1;
+    }
+    
+    .planner-extra-detail {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 1px;
+        margin-bottom: 1px;
+    }
+    
+    .planner-extra-type-badge {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 1px;
+        color: white;
+        font-size: 5pt;
+        font-weight: bold;
+        text-align: center;
+        line-height: 8px;
+    }
+    
+    .planner-extra-type-badge.straordinario {
+        background-color: #ef4444;
+    }
+    
+    .planner-extra-type-badge.prolungamento {
+        background-color: #10b981;
+    }
+    
+    .planner-extra-type-badge.rientro {
+        background-color: #f59e0b;
+    }
+    
+    .planner-extra-hours {
+        font-size: 5pt;
+        color: #374151;
+        font-weight: 500;
+    }
+    
+    .planner-gettone-badge {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 1px;
+        background-color: #3b82f6;
+        color: white;
+        font-size: 5pt;
+        font-weight: bold;
+        text-align: center;
+        line-height: 8px;
     }
 }

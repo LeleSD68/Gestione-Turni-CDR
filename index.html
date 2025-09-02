@@ -866,8 +866,7 @@
     <div id="mod-tooltip"></div>
     
     <div id="mini-menu" class="hidden absolute z-[60] bg-white rounded-lg shadow-xl border text-sm p-2 flex flex-col gap-1 w-48">
-        <a href="#" data-action="edit-notification"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg><span>Modifica</span></a>
-        <hr class="my-1">
+
         <a href="#" data-action="change"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" /><path fill-rule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clip-rule="evenodd" /></svg><span>Cambio Turno</span></a>
         <a href="#" data-action="swap"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 01.707.293l3 3a1 1 0 01-1.414 1.414L11 6.414V12a1 1 0 11-2 0V6.414L7.707 7.707a1 1 0 01-1.414-1.414l3-3A1 1 0 0110 3zm-3.707 9.293a1 1 0 011.414 0L9 13.586V8a1 1 0 112 0v5.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" /></svg><span>Scambio</span></a>
         <a href="#" data-action="period"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd" /></svg><span>Periodo</span></a>
@@ -1135,171 +1134,7 @@
         </div>
     </div>
     
-    <!-- Modal Modifica Notifica -->
-    <div id="modal-edit-notification" class="fixed inset-0 z-50 items-center justify-center hidden modal-backdrop">
-        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-2xl m-4 max-h-[90vh] overflow-y-auto">
-            <div class="flex justify-between items-center mb-6">
-                <h3 class="text-xl font-bold text-gray-800">Modifica Notifica</h3>
-                <button id="close-edit-notification" class="text-gray-400 hover:text-gray-600 text-2xl font-bold">&times;</button>
-            </div>
-            
-            <div class="space-y-6">
-                <!-- Informazioni Notifica -->
-                <div class="bg-gray-50 p-4 rounded-lg">
-                    <h4 class="font-semibold text-gray-700 mb-2">Informazioni Notifica</h4>
-                    <div class="grid grid-cols-2 gap-4 text-sm">
-                        <div>
-                            <span class="font-medium text-gray-600">Operatore:</span>
-                            <span id="edit-notification-operator" class="ml-2"></span>
-                        </div>
-                        <div>
-                            <span class="font-medium text-gray-600">Data:</span>
-                            <span id="edit-notification-date" class="ml-2"></span>
-                        </div>
-                        <div>
-                            <span class="font-medium text-gray-600">Tipo:</span>
-                            <span id="edit-notification-type" class="ml-2"></span>
-                        </div>
-                        <div>
-                            <span class="font-medium text-gray-600">Stato:</span>
-                            <span id="edit-notification-status" class="ml-2"></span>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Modifica Turno -->
-                <div class="border border-blue-200 rounded-lg p-4">
-                    <h4 class="font-semibold text-blue-700 mb-3 flex items-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clip-rule="evenodd" />
-                        </svg>
-                        Modifica Turno
-                    </h4>
-                    <div class="space-y-3">
-                        <div>
-                            <label for="edit-notification-shift" class="block text-sm font-medium text-gray-700 mb-1">Nuovo Turno</label>
-                            <select id="edit-notification-shift" class="modal-input">
-                                <option value="">Mantieni turno attuale</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label for="edit-notification-shift-reason" class="block text-sm font-medium text-gray-700 mb-1">Motivo del cambio</label>
-                            <select id="edit-notification-shift-reason" class="modal-input">
-                                <option value="">Seleziona motivo</option>
-                                <option value="malattia">Malattia</option>
-                                <option value="ferie">Ferie</option>
-                                <option value="emergenza">Emergenza</option>
-                                <option value="sostituzione">Sostituzione</option>
-                                <option value="altro">Altro</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Modifica Orari -->
-                <div class="border border-green-200 rounded-lg p-4">
-                    <h4 class="font-semibold text-green-700 mb-3 flex items-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        Modifica Orari
-                    </h4>
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label for="edit-notification-start-time" class="block text-sm font-medium text-gray-700 mb-1">Ora Inizio</label>
-                            <input type="time" id="edit-notification-start-time" class="modal-input">
-                        </div>
-                        <div>
-                            <label for="edit-notification-end-time" class="block text-sm font-medium text-gray-700 mb-1">Ora Fine</label>
-                            <input type="time" id="edit-notification-end-time" class="modal-input">
-                        </div>
-                    </div>
-                    <div class="mt-3">
-                        <label class="flex items-center text-sm text-gray-700">
-                            <input type="checkbox" id="edit-notification-overtime" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 mr-2">
-                            Straordinario
-                        </label>
-                    </div>
-                </div>
-                
-                <!-- Note e Commenti -->
-                <div class="border border-yellow-200 rounded-lg p-4">
-                    <h4 class="font-semibold text-yellow-700 mb-3 flex items-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                        </svg>
-                        Note e Commenti
-                    </h4>
-                    <div class="space-y-3">
-                        <div>
-                            <label for="edit-notification-note" class="block text-sm font-medium text-gray-700 mb-1">Nota</label>
-                            <textarea id="edit-notification-note" rows="3" class="modal-input" placeholder="Aggiungi una nota per questa notifica..."></textarea>
-                        </div>
-                        <div>
-                            <label for="edit-notification-internal-comment" class="block text-sm font-medium text-gray-700 mb-1">Commento Interno</label>
-                            <textarea id="edit-notification-internal-comment" rows="2" class="modal-input" placeholder="Commento visibile solo al personale amministrativo..."></textarea>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Opzioni Aggiuntive -->
-                <div class="border border-purple-200 rounded-lg p-4">
-                    <h4 class="font-semibold text-purple-700 mb-3 flex items-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        </svg>
-                        Opzioni Aggiuntive
-                    </h4>
-                    <div class="space-y-3">
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <label for="edit-notification-priority" class="block text-sm font-medium text-gray-700 mb-1">Priorità</label>
-                                <select id="edit-notification-priority" class="modal-input">
-                                    <option value="normale">Normale</option>
-                                    <option value="alta">Alta</option>
-                                    <option value="urgente">Urgente</option>
-                                    <option value="bassa">Bassa</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label for="edit-notification-notification-type" class="block text-sm font-medium text-gray-700 mb-1">Tipo Notifica</label>
-                                <select id="edit-notification-notification-type" class="modal-input">
-                                    <option value="cambio">Cambio Turno</option>
-                                    <option value="extra">Ore Extra</option>
-                                    <option value="sostituzione">Sostituzione</option>
-                                    <option value="emergenza">Emergenza</option>
-                                    <option value="ferie">Ferie</option>
-                                    <option value="malattia">Malattia</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="space-y-2">
-                            <label class="flex items-center text-sm text-gray-700">
-                                <input type="checkbox" id="edit-notification-gettone" class="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500 mr-2">
-                                Attiva gettone di chiamata
-                            </label>
-                            <label class="flex items-center text-sm text-gray-700">
-                                <input type="checkbox" id="edit-notification-confirmed" class="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500 mr-2">
-                                Confermata dall'operatore
-                            </label>
-                            <label class="flex items-center text-sm text-gray-700">
-                                <input type="checkbox" id="edit-notification-send-sms" class="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500 mr-2">
-                                Invia notifica SMS
-                            </label>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Pulsanti Azione -->
-            <div class="mt-8 flex justify-end gap-3">
-                <button id="cancel-edit-notification" class="btn-3d btn-gray">Annulla</button>
-                <button id="delete-notification" class="btn-3d btn-red">Elimina</button>
-                <button id="save-edit-notification" class="btn-3d btn-blue">Salva Modifiche</button>
-            </div>
-        </div>
-    </div>
+
     
     <div id="operator-info-panel">
         <div id="operator-info-header">
@@ -1576,6 +1411,17 @@
                 <button id="btn-toggle-auto-backup" class="btn-3d btn-gray text-xs py-2">Pausa</button>
                 <button id="btn-backup-settings" class="btn-3d btn-gray text-xs py-2">Impostazioni</button>
             </div>
+            <!-- Lista Backup -->
+            <div class="bg-gray-50 p-3 rounded-lg">
+                <h4 class="font-semibold text-xs text-gray-600 mb-2">BACKUP DISPONIBILI</h4>
+                <div id="backup-list" class="space-y-2 max-h-32 overflow-y-auto">
+                    <!-- I backup verranno inseriti qui dinamicamente -->
+                </div>
+                <div class="mt-2 grid grid-cols-2 gap-2">
+                    <button id="btn-download-all-backups" class="btn-3d btn-green text-xs py-1">📥 Scarica Tutti</button>
+                    <button id="btn-clear-old-backups" class="btn-3d btn-red text-xs py-1">🗑️ Pulisci Vecchi</button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -1588,13 +1434,19 @@
             </div>
             <div class="p-4 space-y-4">
                 <div>
-                    <label class="block text-sm font-medium text-gray-700">Intervallo (minuti)</label>
-                    <input type="number" id="backup-interval" class="modal-input">
+                    <label class="block text-sm font-medium text-gray-700">Intervallo backup automatico (minuti)</label>
+                    <input type="number" id="backup-interval" class="modal-input" min="1" max="1440" placeholder="30">
+                    <small class="text-xs text-gray-500">Valore tra 1 e 1440 minuti (24 ore)</small>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700">N. max backup da conservare</label>
-                    <input type="number" id="backup-max-count" class="modal-input">
+                    <input type="number" id="backup-max-count" class="modal-input" min="5" max="100" placeholder="10">
+                    <small class="text-xs text-gray-500">Minimo 5, massimo 100 backup</small>
                 </div>
+                <label class="flex items-center text-sm">
+                    <input type="checkbox" id="backup-auto-download" class="h-4 w-4 rounded border-gray-300 mr-2">
+                    <span>Download automatico backup su file</span>
+                </label>
                 <label class="flex items-center text-sm">
                     <input type="checkbox" id="backup-emergency-enabled" class="h-4 w-4 rounded border-gray-300 mr-2">
                     <span>Backup automatico in emergenza</span>
@@ -1602,6 +1454,10 @@
                  <label class="flex items-center text-sm">
                     <input type="checkbox" id="backup-pre-operation" class="h-4 w-4 rounded border-gray-300 mr-2">
                     <span>Abilita backup automatici</span>
+                </label>
+                <label class="flex items-center text-sm">
+                    <input type="checkbox" id="backup-before-operations" class="h-4 w-4 rounded border-gray-300 mr-2">
+                    <span>Backup prima di operazioni critiche</span>
                 </label>
             </div>
             <div class="p-3 bg-gray-50 border-t flex gap-2 justify-end">
