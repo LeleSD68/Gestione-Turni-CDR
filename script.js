@@ -4264,60 +4264,7 @@ function handleScambiPanelClick(e) {
             currentLegendY += shiftLegendBoxHeight + 3; // Spazio ridotto a 3 pixel
         }
         
-        // SECONDA: Legenda incarichi (sotto la legenda turni)
-        const assignmentLegendItems = appState.assignments.filter(item => {
-            const monthKey = getMonthKey(appState.currentDate);
-            const monthData = appState.plannerData[monthKey] || {};
-            return Object.values(monthData).some(data => data.assignmentId === item.id);
-        }).slice(0, 6);
-        
-        if (assignmentLegendItems.length > 0) {
-            const assignmentLegendBoxHeight = 100;
-            
-            // Riquadro principale per la legenda incarichi con stile coerente
-            doc.setFillColor(248, 250, 252); // Sfondo leggermente grigio come la legenda turni
-            doc.rect(legendsX, currentLegendY, legendsWidth, assignmentLegendBoxHeight, 'F');
-            doc.setDrawColor(0, 0, 0);
-            doc.setLineWidth(1.5); // Bordo spesso per coerenza
-            doc.rect(legendsX, currentLegendY, legendsWidth, assignmentLegendBoxHeight, 'S');
-            
-            // Titolo legenda incarichi
-            doc.setFontSize(11); // Stessa dimensione della legenda turni
-            doc.setTextColor(0, 0, 0);
-            doc.text('LEGENDA INCARICHI', legendsX + legendsWidth/2, currentLegendY + 20, { align: 'center' });
-            
-            const colWidth = legendsWidth / 2;
-            const rowHeight = 25;
-            
-            assignmentLegendItems.forEach((item, index) => {
-                    const col = index % 2;
-                    const row = Math.floor(index / 2);
-                    const x = legendsX + 20 + (col * colWidth);
-                    const y = currentLegendY + 40 + (row * rowHeight); // Allineato con la legenda turni
-                    
-                    // Quadratino colorato - stile coerente con la legenda turni
-                    doc.setFillColor(item.colore);
-                    doc.rect(x, y - 5, 12, 12, 'F'); // Dimensione leggermente più grande per visibilità
-                    doc.setDrawColor(0, 0, 0);
-                    doc.setLineWidth(0.3);
-                    doc.rect(x, y - 5, 12, 12, 'S');
-                    
-                    // Nome incarico - stile coerente
-                    doc.setFontSize(8); // Dimensione leggibile
-                    doc.setTextColor(0, 0, 0);
-                    const maxWidth = colWidth - 40; // Larghezza massima per evitare sovrapposizioni
-                    const lines = doc.splitTextToSize(item.nome, maxWidth);
-                    const textToShow = lines[0] || item.nome;
-                    if (textToShow.length > 25) {
-                        doc.text(textToShow.substring(0, 22) + '...', x + 18, y + 2);
-                    } else {
-                        doc.text(textToShow, x + 18, y + 2);
-                    }
-                });
-                
-            // Aggiorna la posizione Y per elementi successivi
-            currentLegendY += assignmentLegendBoxHeight + 10;
-        }
+        // NOTA: Legenda incarichi rimossa dal layout PDF come richiesto
         
         // Firma responsabile sanitario (in basso a destra, allineata)
         const signatureBoxWidth = 180;
@@ -4685,9 +4632,44 @@ function setupEventListeners() {
     document.getElementById('main-nav').addEventListener('click', e => {
         e.preventDefault();
         const link = e.target.closest('.header-nav-link');
+        const dropdownItem = e.target.closest('.dropdown-item');
+        
+        // Gestione click su elementi dropdown
+        if (dropdownItem) {
+            const tabId = dropdownItem.dataset.tab;
+            const action = dropdownItem.dataset.action;
+            
+            if (tabId) {
+                // Navigazione normale per tab
+                document.querySelectorAll('.tab-content').forEach(c => {
+                    c.classList.add('hidden');
+                    c.style.display = 'none';
+                });
+                
+                const selectedTab = document.getElementById(tabId);
+                if (selectedTab) {
+                    selectedTab.classList.remove('hidden');
+                    selectedTab.style.display = '';
+                }
+                
+                document.querySelectorAll('.header-nav-link').forEach(l => l.classList.remove('active'));
+                document.querySelector('.header-nav-link[data-tab="impostazioni"]').classList.add('active');
+                
+                if (tabId === 'config-paths' || tabId === 'config-security') {
+                    renderSettings(tabId);
+                }
+            }
+            return;
+        }
+        
+        // Gestione click su link principali
         if (!link) return;
-
         const tabId = link.dataset.tab;
+        
+        // Skip se è un dropdown toggle
+        if (link.classList.contains('dropdown-toggle')) {
+            return;
+        }
 
         // Nascondi tutti i tab con display none
         document.querySelectorAll('.tab-content').forEach(c => {
@@ -4697,8 +4679,10 @@ function setupEventListeners() {
         
         // Mostra il tab selezionato
         const selectedTab = document.getElementById(tabId);
-        selectedTab.classList.remove('hidden');
-        selectedTab.style.display = '';
+        if (selectedTab) {
+            selectedTab.classList.remove('hidden');
+            selectedTab.style.display = '';
+        }
 
         document.querySelectorAll('.header-nav-link').forEach(l => l.classList.remove('active'));
         link.classList.add('active');
@@ -7827,12 +7811,24 @@ function openOrderChangeModal(draggedOpId, targetOpId) {
     }
 
     function showBackupPanel() {
-        document.getElementById('backup-panel').style.display = 'block';
-        updateBackupUI();
+        console.log('showBackupPanel chiamata');
+        const backupPanel = document.getElementById('backup-panel');
+        if (backupPanel) {
+            backupPanel.classList.remove('hidden');
+            backupPanel.style.display = 'block';
+            console.log('Pannello backup mostrato');
+            updateBackupUI();
+        } else {
+            console.error('Elemento backup-panel non trovato!');
+        }
     }
 
     function hideBackupPanel() {
-        document.getElementById('backup-panel').style.display = 'none';
+        const backupPanel = document.getElementById('backup-panel');
+        if (backupPanel) {
+            backupPanel.classList.add('hidden');
+            backupPanel.style.display = 'none';
+        }
     }
 
     function showBackupSettings() {
@@ -7926,18 +7922,61 @@ function openOrderChangeModal(draggedOpId, targetOpId) {
     }
 
     function initializeBackupUI() {
-        document.getElementById('open-backup-panel').addEventListener('click', showBackupPanel);
-        document.getElementById('close-backup-panel').addEventListener('click', hideBackupPanel);
-        document.getElementById('btn-manual-backup').addEventListener('click', () => performIncrementalBackup('manual'));
-        document.getElementById('btn-toggle-auto-backup').addEventListener('click', toggleAutoBackup);
-        document.getElementById('btn-backup-settings').addEventListener('click', showBackupSettings);
-        document.getElementById('close-backup-settings').addEventListener('click', hideBackupSettings);
-        document.getElementById('btn-cancel-backup-settings').addEventListener('click', hideBackupSettings);
-        document.getElementById('btn-save-backup-settings').addEventListener('click', saveBackupSettingsFromUI);
+        // Controlli di sicurezza per verificare l'esistenza degli elementi
+        const openBackupPanel = document.getElementById('open-backup-panel');
+        const closeBackupPanel = document.getElementById('close-backup-panel');
+        const btnManualBackup = document.getElementById('btn-manual-backup');
+        const btnToggleAutoBackup = document.getElementById('btn-toggle-auto-backup');
+        const btnBackupSettings = document.getElementById('btn-backup-settings');
+        const closeBackupSettings = document.getElementById('close-backup-settings');
+        const btnCancelBackupSettings = document.getElementById('btn-cancel-backup-settings');
+        const btnSaveBackupSettings = document.getElementById('btn-save-backup-settings');
+        const btnDownloadAllBackups = document.getElementById('btn-download-all-backups');
+        const btnClearOldBackups = document.getElementById('btn-clear-old-backups');
+
+        // Aggiungi event listener solo se gli elementi esistono
+        if (openBackupPanel) {
+            openBackupPanel.addEventListener('click', showBackupPanel);
+        } else {
+            console.error('Elemento open-backup-panel non trovato!');
+        }
+        
+        if (closeBackupPanel) {
+            closeBackupPanel.addEventListener('click', hideBackupPanel);
+        }
+        
+        if (btnManualBackup) {
+            btnManualBackup.addEventListener('click', () => performIncrementalBackup('manual'));
+        }
+        
+        if (btnToggleAutoBackup) {
+            btnToggleAutoBackup.addEventListener('click', toggleAutoBackup);
+        }
+        
+        if (btnBackupSettings) {
+            btnBackupSettings.addEventListener('click', showBackupSettings);
+        }
+        
+        if (closeBackupSettings) {
+            closeBackupSettings.addEventListener('click', hideBackupSettings);
+        }
+        
+        if (btnCancelBackupSettings) {
+            btnCancelBackupSettings.addEventListener('click', hideBackupSettings);
+        }
+        
+        if (btnSaveBackupSettings) {
+            btnSaveBackupSettings.addEventListener('click', saveBackupSettingsFromUI);
+        }
         
         // Nuovi event listener per funzionalità avanzate
-        document.getElementById('btn-download-all-backups').addEventListener('click', downloadAllBackups);
-        document.getElementById('btn-clear-old-backups').addEventListener('click', clearOldBackups);
+        if (btnDownloadAllBackups) {
+            btnDownloadAllBackups.addEventListener('click', downloadAllBackups);
+        }
+        
+        if (btnClearOldBackups) {
+            btnClearOldBackups.addEventListener('click', clearOldBackups);
+        }
     }
 
     // =================================================================================
@@ -8115,7 +8154,7 @@ function openOrderChangeModal(draggedOpId, targetOpId) {
 
     class PlannerAutoFit {
         constructor() {
-            this.isEnabled = false; // Disabilitato per mantenere zoom fisso
+            this.isEnabled = true; // Abilitato per garantire visibilità iniziale
             this.currentScale = 1;
             this.minScale = 0.5;
             this.maxScale = 2;
@@ -8131,6 +8170,34 @@ function openOrderChangeModal(draggedOpId, targetOpId) {
             this.createZoomControls();
             this.bindEvents();
             this.calculateOptimalScale();
+            
+            // Osserva quando il planner diventa visibile
+            this.observePlannerVisibility();
+        }
+        
+        observePlannerVisibility() {
+            const plannerDiv = document.getElementById('planner');
+            if (!plannerDiv) return;
+            
+            // Usa MutationObserver per rilevare quando il planner diventa visibile
+            const observer = new MutationObserver((mutations) => {
+                mutations.forEach((mutation) => {
+                    if (mutation.type === 'attributes' && 
+                        (mutation.attributeName === 'class' || mutation.attributeName === 'style')) {
+                        const isHidden = plannerDiv.classList.contains('hidden') || 
+                                       plannerDiv.style.display === 'none';
+                        if (!isHidden && this.isEnabled) {
+                            // Il planner è diventato visibile, ricalcola le dimensioni
+                            setTimeout(() => this.calculateOptimalScale(), 100);
+                        }
+                    }
+                });
+            });
+            
+            observer.observe(plannerDiv, {
+                attributes: true,
+                attributeFilter: ['class', 'style']
+            });
         }
         
         createIndicator() {
@@ -8263,11 +8330,23 @@ function openOrderChangeModal(draggedOpId, targetOpId) {
             
             if (!container || !table) return;
             
+            // Assicurati che il planner sia visibile
+            const plannerDiv = document.getElementById('planner');
+            if (plannerDiv && plannerDiv.classList.contains('hidden')) {
+                // Se il planner è nascosto, riprova dopo un breve ritardo
+                setTimeout(() => this.calculateOptimalScale(), 100);
+                return;
+            }
+            
             // Ottieni dimensioni disponibili
             const containerRect = container.getBoundingClientRect();
             const tableRect = table.getBoundingClientRect();
             
-            if (tableRect.width === 0 || tableRect.height === 0) return;
+            if (tableRect.width === 0 || tableRect.height === 0) {
+                // Se le dimensioni sono ancora 0, riprova dopo un breve ritardo
+                setTimeout(() => this.calculateOptimalScale(), 100);
+                return;
+            }
             
             // Calcola scale per adattare larghezza e altezza con margini
             const marginX = 20; // Margine orizzontale
@@ -8538,6 +8617,7 @@ function openOrderChangeModal(draggedOpId, targetOpId) {
         initializeBackupUI();
         initializeGridCustomization();
         initializePlannerAutoFit();
+        initializeMobileInterface();
         
         // Aggiungi event listeners per il sistema di chiamate
         document.getElementById('view-call-history')?.addEventListener('click', () => {
@@ -8577,6 +8657,13 @@ function openOrderChangeModal(draggedOpId, targetOpId) {
                 if (plannerDiv) {
                     plannerDiv.classList.remove('hidden');
                     plannerDiv.style.display = '';
+                    
+                    // Forza il ricalcolo delle dimensioni dopo che il planner è visibile
+                    setTimeout(() => {
+                        if (window.plannerAutoFit) {
+                            window.plannerAutoFit.calculateOptimalScale();
+                        }
+                    }, 200);
                 }
             }
         }, 100);
@@ -10232,13 +10319,77 @@ function getPlannerPrintStyles() {
             .symbols-summary p {
                 font-size: 10pt;
             }
+        }
+    `;
+    
+    return css;
+}
+
+
+
+// Gestione touch per sotto-menu su mobile
+function initializeDropdownTouchHandlers() {
+    const dropdowns = document.querySelectorAll('.nav-dropdown');
+    
+    dropdowns.forEach(dropdown => {
+        const toggle = dropdown.querySelector('.dropdown-toggle');
+        const menu = dropdown.querySelector('.dropdown-menu');
+        
+        // Touch handlers per mobile
+        toggle.addEventListener('touchstart', (e) => {
+            e.preventDefault();
             
-            .hours-summary h3 {
-                 font-size: 12pt;
-                 margin-bottom: 8px;
-             }
-             
-             .total-hours-summary {
+            // Chiudi altri dropdown aperti
+            dropdowns.forEach(other => {
+                if (other !== dropdown) {
+                    other.classList.remove('active');
+                }
+            });
+            
+            // Toggle del dropdown corrente
+            dropdown.classList.toggle('active');
+        });
+        
+        // Chiudi dropdown quando si clicca fuori
+        document.addEventListener('touchstart', (e) => {
+            if (!dropdown.contains(e.target)) {
+                dropdown.classList.remove('active');
+            }
+        });
+        
+        // Gestione hover per desktop
+        dropdown.addEventListener('mouseenter', () => {
+            if (window.innerWidth > 768) {
+                dropdown.classList.add('active');
+            }
+        });
+        
+        dropdown.addEventListener('mouseleave', () => {
+            if (window.innerWidth > 768) {
+                dropdown.classList.remove('active');
+            }
+        });
+    });
+}
+
+// Inizializza i gestori touch al caricamento
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+        initializeDropdownTouchHandlers();
+    });
+} else {
+    initializeDropdownTouchHandlers();
+}
+
+// CSS per il riepilogo ore (dovrebbe essere in style.css)
+function getHoursSummaryCss() {
+    return `
+        .hours-summary h3 {
+            font-size: 12pt;
+            margin-bottom: 8px;
+        }
+        
+        .total-hours-summary {
                  margin-top: 10px;
                  padding: 8px;
              }
@@ -10270,4 +10421,294 @@ function createPrintWindow(htmlContent) {
         console.error('Errore durante l\'apertura della finestra di stampa:', error);
         showToast('Errore durante l\'apertura della finestra di stampa.', 'error');
     }
+}
+
+// ===============================================================
+// MOBILE INTERFACE FUNCTIONS
+// ===============================================================
+
+function initializeMobileInterface() {
+    console.log('Inizializzazione interfaccia mobile...');
+    
+    // Elementi del menu mobile
+    const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
+    const mobileMenuPanel = document.getElementById('mobile-menu-panel');
+    const mobileMenuOverlay = document.getElementById('mobile-menu-overlay');
+    const mobileFullscreenToggle = document.getElementById('mobile-fullscreen-toggle');
+    
+    // Controlli mobile nel menu
+    const mobileThemeToggle = document.getElementById('mobile-theme-toggle');
+    const mobileThreedToggle = document.getElementById('mobile-threed-toggle');
+    const mobileSymbolsToggle = document.getElementById('mobile-symbols-toggle');
+    
+    // Controlli desktop corrispondenti
+    const desktopThemeToggle = document.getElementById('theme-toggle');
+    const desktopThreedToggle = document.getElementById('threed-effect-toggle');
+    const desktopSymbolsToggle = document.getElementById('mod-symbols-toggle');
+    
+    if (!mobileMenuToggle || !mobileMenuPanel || !mobileMenuOverlay || !mobileFullscreenToggle) {
+        console.error('Elementi del menu mobile non trovati');
+        return;
+    }
+    
+    // Stato del menu mobile
+    let isMobileMenuOpen = false;
+    let isMobileFullscreen = false;
+    
+    // Funzione per aprire/chiudere il menu mobile
+    function toggleMobileMenu() {
+        isMobileMenuOpen = !isMobileMenuOpen;
+        
+        if (isMobileMenuOpen) {
+            mobileMenuPanel.classList.add('open');
+            mobileMenuOverlay.classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        } else {
+            mobileMenuPanel.classList.remove('open');
+            mobileMenuOverlay.classList.add('hidden');
+            document.body.style.overflow = '';
+        }
+    }
+    
+    // Funzione per attivare/disattivare la modalità fullscreen mobile
+    function toggleMobileFullscreen() {
+        isMobileFullscreen = !isMobileFullscreen;
+        const plannerDiv = document.getElementById('planner');
+        
+        if (isMobileFullscreen) {
+            plannerDiv.classList.add('mobile-fullscreen');
+            document.body.classList.add('planner-active');
+            
+            // Nascondi i nomi e mostra solo i cognomi
+            const operatorNames = document.querySelectorAll('.operator-name');
+            const operatorSurnames = document.querySelectorAll('.operator-surname');
+            
+            operatorNames.forEach(name => name.style.display = 'none');
+            operatorSurnames.forEach(surname => {
+                surname.style.display = 'block';
+                surname.style.fontWeight = '600';
+            });
+            
+            // Aggiorna l'icona del pulsante fullscreen
+            mobileFullscreenToggle.innerHTML = `
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            `;
+            
+            showToast('Modalità fullscreen attivata', 'success');
+        } else {
+            plannerDiv.classList.remove('mobile-fullscreen');
+            document.body.classList.remove('planner-active');
+            
+            // Ripristina la visualizzazione normale
+            const operatorNames = document.querySelectorAll('.operator-name');
+            const operatorSurnames = document.querySelectorAll('.operator-surname');
+            
+            operatorNames.forEach(name => name.style.display = '');
+            operatorSurnames.forEach(surname => {
+                surname.style.display = '';
+                surname.style.fontWeight = '';
+            });
+            
+            // Ripristina l'icona del pulsante fullscreen
+            mobileFullscreenToggle.innerHTML = `
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path>
+                </svg>
+            `;
+            
+            showToast('Modalità fullscreen disattivata', 'info');
+        }
+    }
+    
+    // Sincronizzazione dei controlli mobile con quelli desktop
+    function syncMobileControls() {
+        if (mobileThemeToggle && desktopThemeToggle) {
+            mobileThemeToggle.checked = desktopThemeToggle.checked;
+        }
+        if (mobileThreedToggle && desktopThreedToggle) {
+            mobileThreedToggle.checked = desktopThreedToggle.checked;
+        }
+        if (mobileSymbolsToggle && desktopSymbolsToggle) {
+            mobileSymbolsToggle.checked = desktopSymbolsToggle.checked;
+        }
+    }
+    
+    // Event listeners
+    mobileMenuToggle.addEventListener('click', toggleMobileMenu);
+    mobileMenuOverlay.addEventListener('click', toggleMobileMenu);
+    mobileFullscreenToggle.addEventListener('click', toggleMobileFullscreen);
+    
+    // Sincronizzazione controlli mobile-desktop
+    if (mobileThemeToggle && desktopThemeToggle) {
+        mobileThemeToggle.addEventListener('change', () => {
+            desktopThemeToggle.checked = mobileThemeToggle.checked;
+            desktopThemeToggle.dispatchEvent(new Event('change'));
+        });
+    }
+    
+    if (mobileThreedToggle && desktopThreedToggle) {
+        mobileThreedToggle.addEventListener('change', () => {
+            desktopThreedToggle.checked = mobileThreedToggle.checked;
+            desktopThreedToggle.dispatchEvent(new Event('change'));
+        });
+    }
+    
+    if (mobileSymbolsToggle && desktopSymbolsToggle) {
+        mobileSymbolsToggle.addEventListener('change', () => {
+            desktopSymbolsToggle.checked = mobileSymbolsToggle.checked;
+            desktopSymbolsToggle.dispatchEvent(new Event('change'));
+        });
+    }
+    
+    // Sincronizzazione iniziale
+    syncMobileControls();
+    
+    // Gestione touch per zoom e pan nella modalità fullscreen
+    let initialDistance = 0;
+    let initialScale = 1;
+    let currentScale = 1;
+    let isPanning = false;
+    let startX = 0;
+    let startY = 0;
+    let translateX = 0;
+    let translateY = 0;
+    
+    function getDistance(touches) {
+        const dx = touches[0].clientX - touches[1].clientX;
+        const dy = touches[0].clientY - touches[1].clientY;
+        return Math.sqrt(dx * dx + dy * dy);
+    }
+    
+    // Reset zoom function
+    function resetZoom() {
+        if (!isMobileFullscreen) return;
+        
+        currentScale = 1;
+        translateX = 0;
+        translateY = 0;
+        
+        const tableContainer = document.querySelector('.mobile-fullscreen .table-container');
+        if (tableContainer) {
+            tableContainer.style.transformOrigin = 'top left';
+            tableContainer.style.transform = 'scale(1) translate(0px, 0px)';
+            tableContainer.style.transition = 'transform 0.3s ease-out';
+            
+            setTimeout(() => {
+                tableContainer.style.transition = '';
+            }, 300);
+        }
+    }
+    
+    // Double tap to reset zoom
+    let lastTapTime = 0;
+    function handleDoubleTap(e) {
+        const currentTime = new Date().getTime();
+        const tapLength = currentTime - lastTapTime;
+        
+        if (tapLength < 500 && tapLength > 0) {
+            e.preventDefault();
+            resetZoom();
+        }
+        
+        lastTapTime = currentTime;
+    }
+    
+    function handleTouchStart(e) {
+        if (!isMobileFullscreen) return;
+        
+        const tableContainer = document.querySelector('.mobile-fullscreen .table-container');
+        if (!tableContainer) return;
+        
+        if (e.touches.length === 2) {
+            // Zoom gesture
+            initialDistance = getDistance(e.touches);
+            initialScale = currentScale;
+            tableContainer.classList.add('zooming');
+            document.getElementById('planner').classList.add('gesture-active');
+        } else if (e.touches.length === 1) {
+            // Pan gesture
+            isPanning = true;
+            startX = e.touches[0].clientX - translateX;
+            startY = e.touches[0].clientY - translateY;
+            tableContainer.classList.add('panning');
+            document.getElementById('planner').classList.add('gesture-active');
+        }
+    }
+    
+    function handleTouchMove(e) {
+        if (!isMobileFullscreen) return;
+        
+        e.preventDefault();
+        
+        if (e.touches.length === 2 && initialDistance > 0) {
+            // Zoom gesture with center point
+            const currentDistance = getDistance(e.touches);
+            const scale = (currentDistance / initialDistance) * initialScale;
+            currentScale = Math.max(0.3, Math.min(5, scale)); // Expanded zoom range
+            
+            // Calculate zoom center point
+            const centerX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+            const centerY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+            
+            const tableContainer = document.querySelector('.mobile-fullscreen .table-container');
+            if (tableContainer) {
+                const rect = tableContainer.getBoundingClientRect();
+                const offsetX = (centerX - rect.left) / rect.width;
+                const offsetY = (centerY - rect.top) / rect.height;
+                
+                tableContainer.style.transformOrigin = `${offsetX * 100}% ${offsetY * 100}%`;
+                tableContainer.style.transform = `scale(${currentScale}) translate(${translateX}px, ${translateY}px)`;
+            }
+        } else if (e.touches.length === 1 && isPanning) {
+            // Pan gesture with momentum and boundaries
+            const deltaX = e.touches[0].clientX - startX;
+            const deltaY = e.touches[0].clientY - startY;
+            
+            // Apply momentum and boundaries
+            translateX = Math.max(-window.innerWidth, Math.min(window.innerWidth, deltaX));
+            translateY = Math.max(-window.innerHeight, Math.min(window.innerHeight, deltaY));
+            
+            const tableContainer = document.querySelector('.mobile-fullscreen .table-container');
+            if (tableContainer) {
+                tableContainer.style.transform = `scale(${currentScale}) translate(${translateX}px, ${translateY}px)`;
+            }
+        }
+    }
+    
+    function handleTouchEnd(e) {
+        if (!isMobileFullscreen) return;
+        
+        const tableContainer = document.querySelector('.mobile-fullscreen .table-container');
+        if (tableContainer) {
+            tableContainer.classList.remove('zooming', 'panning');
+        }
+        
+        if (e.touches.length === 0) {
+            isPanning = false;
+            initialDistance = 0;
+            document.getElementById('planner').classList.remove('gesture-active');
+        }
+    }
+    
+    // Aggiungi event listeners per touch
+    document.addEventListener('touchstart', handleTouchStart, { passive: false });
+        document.addEventListener('touchmove', handleTouchMove, { passive: false });
+        document.addEventListener('touchend', handleTouchEnd, { passive: false });
+        
+        // Add double tap listener for zoom reset
+        const plannerTable = document.getElementById('planner-table');
+        if (plannerTable) {
+            plannerTable.addEventListener('touchend', handleDoubleTap, { passive: false });
+        }
+    
+    // Gestione tasto ESC per uscire dalla modalità fullscreen
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && isMobileFullscreen) {
+            toggleMobileFullscreen();
+        }
+    });
+    
+    console.log('Interfaccia mobile inizializzata con successo');
 }
